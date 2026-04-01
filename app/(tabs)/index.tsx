@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
+import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, TIPS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 
@@ -12,15 +13,13 @@ const CHART_PB = 4;
 
 type Range = "week" | "month" | "year" | "all";
 const RANGES: { key: Range; label: string }[] = [
-  { key: "week", label: "7J" },
-  { key: "month", label: "1M" },
-  { key: "year", label: "1A" },
-  { key: "all", label: "Tout" },
+  { key: "week",  label: "7J"   },
+  { key: "month", label: "1M"   },
+  { key: "year",  label: "1A"   },
+  { key: "all",   label: "Tout" },
 ];
 
 // ─── Momentum : EMA avec décroissance asymétrique ────────────
-// Plus le momentum est haut, moins un jour raté lui coûte.
-// Ex : après 30 jours à 100%, rater 1 jour = ~0.3 pts de perte seulement.
 function computeMomentum(history: Record<string, number>): Record<string, number> {
   const allKeys = Object.keys(history).sort();
   if (allKeys.length === 0) return {};
@@ -34,10 +33,8 @@ function computeMomentum(history: Record<string, number>): Record<string, number
     const key = cur.toISOString().slice(0, 10);
     const score = history[key] ?? 0;
     if (score > 0) {
-      // Monte vers le score du jour (croissance régulière)
       m = m + 0.08 * (score - m);
     } else {
-      // Décroissance exponentiellement réduite quand momentum est élevé
       m = m * (1 - 0.05 * Math.exp(-m / 35));
     }
     result[key] = Math.round(m * 10) / 10;
@@ -48,7 +45,6 @@ function computeMomentum(history: Record<string, number>): Record<string, number
 
 // ─── Données chart selon la plage ────────────────────────────
 interface ChartPoint { score: number; label: string }
-
 const MN = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 const DN = ["D","L","M","M","J","V","S"];
 
@@ -62,7 +58,6 @@ function getChartData(mHist: Record<string, number>, range: Range): ChartPoint[]
       return { score: mHist[d.toISOString().slice(0, 10)] || 0, label: i === 6 ? "Auj" : DN[d.getDay()] };
     });
   }
-
   if (range === "month") {
     return Array.from({ length: 30 }, (_, i) => {
       const d = new Date(today);
@@ -70,7 +65,6 @@ function getChartData(mHist: Record<string, number>, range: Range): ChartPoint[]
       return { score: mHist[d.toISOString().slice(0, 10)] || 0, label: i % 7 === 0 ? `${d.getDate()}` : "" };
     });
   }
-
   if (range === "year") {
     return Array.from({ length: 52 }, (_, w) => {
       const we = new Date(today);
@@ -85,16 +79,13 @@ function getChartData(mHist: Record<string, number>, range: Range): ChartPoint[]
       return { score: cnt > 0 ? Math.round(sum / cnt) : 0, label: w % 8 === 0 ? MN[we.getMonth()] : "" };
     });
   }
-
   // All time — moyennes mensuelles
   const allKeys = Object.keys(mHist).sort();
   if (allKeys.length === 0) return [{ score: 0, label: "" }];
-
   const months: ChartPoint[] = [];
   const first = new Date(allKeys[0]);
   const cur = new Date(first.getFullYear(), first.getMonth(), 1);
   const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-
   while (cur <= endDate) {
     const y = cur.getFullYear(), mo = cur.getMonth();
     let sum = 0, cnt = 0;
@@ -132,33 +123,80 @@ function buildChart(data: ChartPoint[]) {
   return { pts, line, fill };
 }
 
-// ─── Dashboard ────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    root:          { flex: 1, backgroundColor: c.bg, paddingHorizontal: 16 },
+    header:        { paddingTop: 60, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 },
+    headerSub:     { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
+    headerTitle:   { fontSize: 24, fontWeight: "800", color: c.text },
+    headerRight:   { flexDirection: "row", gap: 10, alignItems: "center" },
+    themeBtn:      { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
+    rankBadge:     { width: 48, height: 48, borderRadius: 24, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
+    rankLabel:     { fontSize: 16, fontWeight: "800" },
+    card:          { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: 20 },
+    cardTitle:     { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700" },
+    chartHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+    rangeRow:      { flexDirection: "row", gap: 5 },
+    rangeBtn:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: c.border2 },
+    rangeBtnActive:{ borderColor: "#C9A96E55", backgroundColor: "#C9A96E11" },
+    rangeTxt:      { fontSize: 9, fontWeight: "700", color: c.textFaint, letterSpacing: 0.5 },
+    rangeTxtActive:{ color: "#C9A96E" },
+    ringWrap:      { alignItems: "center", justifyContent: "center", marginBottom: 20, height: 150 },
+    ringCenter:    { position: "absolute", alignItems: "center" },
+    ringScore:     { fontSize: 36, fontWeight: "800", lineHeight: 40 },
+    ringSubLabel:  { fontSize: 9, letterSpacing: 3, color: c.textMuted, fontWeight: "700", marginTop: 2 },
+    // Fix overflow : letterSpacing 0, maxWidth, textAlign center
+    rankTitle:     { fontSize: 8, fontWeight: "700", letterSpacing: 0, marginTop: 4, maxWidth: 90, textAlign: "center" },
+    statsRow:      { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
+    stat:          { alignItems: "center" },
+    statNum:       { fontSize: 20, fontWeight: "800" },
+    statLabel:     { fontSize: 10, color: c.textFaint, marginTop: 4 },
+    statDivider:   { width: 1, height: 32, backgroundColor: c.border },
+    weakRow:       { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
+    weakLabel:     { color: c.textSub, fontSize: 13 },
+    weakPct:       { fontSize: 12, fontWeight: "700" },
+    barTrack:      { height: 4, backgroundColor: c.surface, borderRadius: 2, overflow: "hidden" },
+    barFill:       { height: "100%", borderRadius: 2 },
+    badgeGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    badgeItem:     { width: "22%", alignItems: "center", gap: 5 },
+    badgeIcon:     { width: 44, height: 44, borderRadius: 12, backgroundColor: c.surface, alignItems: "center", justifyContent: "center", borderWidth: 1 },
+    badgeName:     { fontSize: 8, color: c.textSub, textAlign: "center", fontWeight: "700" },
+    tipCard:       { marginTop: 12, backgroundColor: c.card, borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12 },
+    tipText:       { fontSize: 13, color: c.textSub, lineHeight: 20, flex: 1 },
+  });
+}
+
 const DEFAULT_STATS = {
   streak: 0, totalChecked: 0, perfectDays: 0,
   waterCount: 0, goalsCreated: 0, avgScore: 0, photos: 0,
 };
 
+// ─── Dashboard ────────────────────────────────────────────────
 export default function Dashboard() {
-  const [loaded, setLoaded] = useState(false);
-  const [score, setScore] = useState(0);
-  const [stats, setStats] = useState(DEFAULT_STATS);
-  const [goals, setGoals] = useState<any[]>([]);
-  const [history, setHistory] = useState<Record<string, number>>({});
-  const [habits, setHabits] = useState<any[]>([]);
-  const [habitsLen, setHabitsLen] = useState(0);
+  const { colors, mode, toggle } = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+
+  const [loaded, setLoaded]               = useState(false);
+  const [score, setScore]                 = useState(0);
+  const [stats, setStats]                 = useState(DEFAULT_STATS);
+  const [goals, setGoals]                 = useState<any[]>([]);
+  const [history, setHistory]             = useState<Record<string, number>>({});
+  const [habits, setHabits]               = useState<any[]>([]);
+  const [habitsLen, setHabitsLen]         = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
-  const [habitCounts, setHabitCounts] = useState<Record<string, number>>({});
-  const [range, setRange] = useState<Range>("week");
+  const [habitCounts, setHabitCounts]     = useState<Record<string, number>>({});
+  const [range, setRange]                 = useState<Range>("week");
   const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
 
   useEffect(() => {
     const load = async () => {
       try {
         const habitsData = await storage.get("lm_habits", DEFAULT_HABITS);
-        const checked   = await storage.get(`lm_checked_${todayKey()}`, {});
-        const g         = await storage.get("lm_goals", DEFAULT_GOALS);
-        const h         = await storage.get("lm_history", {});
-        const s         = await storage.get("lm_stats", DEFAULT_STATS);
+        const checked    = await storage.get(`lm_checked_${todayKey()}`, {});
+        const g          = await storage.get("lm_goals", DEFAULT_GOALS);
+        const h          = await storage.get("lm_history", {});
+        const s          = await storage.get("lm_stats", DEFAULT_STATS);
 
         const habitsArr  = Array.isArray(habitsData) ? habitsData : DEFAULT_HABITS;
         const checkedObj = checked && typeof checked === "object" ? checked : {};
@@ -169,7 +207,6 @@ export default function Dashboard() {
         const completed = Object.values(checkedObj).filter(Boolean).length;
         const sc = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
 
-        // Points faibles : lire les 7 derniers jours par habitude
         const counts: Record<string, number> = {};
         const today = new Date();
         for (let i = 0; i < 7; i++) {
@@ -202,7 +239,7 @@ export default function Dashboard() {
 
   if (!loaded) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#080808", justifyContent: "center", alignItems: "center" }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
         <Text style={{ color: "#C9A96E", fontSize: 32 }}>◈</Text>
       </View>
     );
@@ -213,14 +250,12 @@ export default function Dashboard() {
   const offset = circ - (score / 100) * circ;
   const unlockedBadges = BADGES.filter(b => b.condition(stats));
 
-  // Points faibles : habitudes < 100% sur 7 jours
   const weakHabits = habits
     .map(h => ({ ...h, rate: Math.round(((habitCounts[h.id] || 0) / 7) * 100) }))
     .filter(h => h.rate < 100)
     .sort((a, b) => a.rate - b.rate)
     .slice(0, 3);
 
-  // Courbe momentum
   const momentumHist = computeMomentum(history);
   const chartData    = getChartData(momentumHist, range);
   const { pts, line, fill } = buildChart(chartData);
@@ -235,8 +270,13 @@ export default function Dashboard() {
           <Text style={styles.headerSub}>LOOKSMAX OS</Text>
           <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
-        <View style={[styles.rankBadge, { borderColor: rank.color }]}>
-          <Text style={[styles.rankLabel, { color: rank.color }]}>{rank.label}</Text>
+        <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.themeBtn} onPress={toggle}>
+            <Text style={{ fontSize: 15 }}>{mode === "dark" ? "☀️" : "🌙"}</Text>
+          </TouchableOpacity>
+          <View style={[styles.rankBadge, { borderColor: rank.color }]}>
+            <Text style={[styles.rankLabel, { color: rank.color }]}>{rank.label}</Text>
+          </View>
         </View>
       </View>
 
@@ -250,7 +290,7 @@ export default function Dashboard() {
                 <Stop offset="100%" stopColor="#F0D090" />
               </LinearGradient>
             </Defs>
-            <Circle cx={70} cy={70} r={54} fill="none" stroke="#1a1a1a" strokeWidth={10} />
+            <Circle cx={70} cy={70} r={54} fill="none" stroke={colors.border} strokeWidth={10} />
             <Circle cx={70} cy={70} r={54} fill="none" stroke="url(#ringGrad)" strokeWidth={10}
               strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" />
           </Svg>
@@ -304,12 +344,10 @@ export default function Dashboard() {
               <Stop offset="100%" stopColor={rank.color} stopOpacity={0} />
             </LinearGradient>
           </Defs>
-          {/* Lignes de référence */}
           {[25, 50, 75].map(v => {
             const gy = CHART_H - CHART_PB - (v / 100) * (CHART_H - CHART_PT - CHART_PB);
-            return <Line key={v} x1={0} y1={gy} x2={CHART_W} y2={gy} stroke="#1a1a1a" strokeWidth={1} />;
+            return <Line key={v} x1={0} y1={gy} x2={CHART_W} y2={gy} stroke={colors.border} strokeWidth={1} />;
           })}
-          {/* Courbe */}
           {pts.length === 1 ? (
             <Circle cx={pts[0].x} cy={pts[0].y} r={4} fill={rank.color} />
           ) : (
@@ -318,20 +356,18 @@ export default function Dashboard() {
               <Path d={line} fill="none" stroke={rank.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
             </>
           )}
-          {/* Point actuel */}
           {pts.length > 0 && (
             <Circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r={3.5} fill={rank.color} />
           )}
         </Svg>
 
-        {/* Labels axe X */}
         <View style={{ height: 18, marginTop: 4, position: "relative" }}>
           {chartData.map((pt, i) => {
             if (!pt.label) return null;
             const pct = n > 1 ? (i / (n - 1)) * 100 : 50;
             return (
               <View key={i} style={{ position: "absolute", left: `${pct}%` as any, width: 26, marginLeft: -13 }}>
-                <Text style={{ fontSize: 8, color: "#555", fontWeight: "700", textAlign: "center" }}>
+                <Text style={{ fontSize: 8, color: colors.textMuted, fontWeight: "700", textAlign: "center" }}>
                   {pt.label}
                 </Text>
               </View>
@@ -340,7 +376,7 @@ export default function Dashboard() {
         </View>
       </View>
 
-      {/* Points faibles (masqué si tout à 100%) */}
+      {/* Points faibles */}
       {weakHabits.length > 0 && (
         <View style={[styles.card, { marginTop: 12 }]}>
           <Text style={[styles.cardTitle, { marginBottom: 14 }]}>POINTS FAIBLES — 7 JOURS</Text>
@@ -369,7 +405,7 @@ export default function Dashboard() {
             const unlocked = unlockedBadges.find(u => u.id === b.id);
             return (
               <View key={b.id} style={[styles.badgeItem, { opacity: unlocked ? 1 : 0.2 }]}>
-                <View style={[styles.badgeIcon, { borderColor: unlocked ? "#C9A96E55" : "#1A1A1A" }]}>
+                <View style={[styles.badgeIcon, { borderColor: unlocked ? "#C9A96E55" : colors.border }]}>
                   <Text style={{ fontSize: 20 }}>{b.icon}</Text>
                 </View>
                 <Text style={styles.badgeName}>{b.label}</Text>
@@ -387,7 +423,7 @@ export default function Dashboard() {
             const pct = g.target > 0 ? Math.min(Math.round((g.progress / g.target) * 100), 100) : 0;
             return (
               <View key={g.id} style={{ marginBottom: 12 }}>
-                <Text style={{ color: "#888", fontSize: 12, marginBottom: 6 }}>{g.icon} {g.label}</Text>
+                <Text style={{ color: colors.textSub, fontSize: 12, marginBottom: 6 }}>{g.icon} {g.label}</Text>
                 <View style={styles.barTrack}>
                   <View style={[styles.barFill, { width: `${pct}%` as any, backgroundColor: g.color }]} />
                 </View>
@@ -405,41 +441,3 @@ export default function Dashboard() {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#080808", paddingHorizontal: 16 },
-  header: { paddingTop: 60, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 1, borderBottomColor: "#161616", marginBottom: 16 },
-  headerSub: { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
-  headerTitle: { fontSize: 24, fontWeight: "800", color: "#F0EAE0" },
-  rankBadge: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: "#0F0F0F" },
-  rankLabel: { fontSize: 16, fontWeight: "800" },
-  card: { backgroundColor: "#0F0F0F", borderWidth: 1, borderColor: "#1A1A1A", borderRadius: 16, padding: 20 },
-  cardTitle: { fontSize: 10, letterSpacing: 3, color: "#444", fontWeight: "700" },
-  chartHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-  rangeRow: { flexDirection: "row", gap: 5 },
-  rangeBtn: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: "#222" },
-  rangeBtnActive: { borderColor: "#C9A96E55", backgroundColor: "#C9A96E11" },
-  rangeTxt: { fontSize: 9, fontWeight: "700", color: "#333", letterSpacing: 0.5 },
-  rangeTxtActive: { color: "#C9A96E" },
-  ringWrap: { alignItems: "center", justifyContent: "center", marginBottom: 20, height: 150 },
-  ringCenter: { position: "absolute", alignItems: "center" },
-  ringScore: { fontSize: 36, fontWeight: "800", lineHeight: 40 },
-  ringSubLabel: { fontSize: 9, letterSpacing: 3, color: "#555", fontWeight: "700", marginTop: 2 },
-  rankTitle: { fontSize: 9, fontWeight: "700", letterSpacing: 2, marginTop: 4 },
-  statsRow: { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-  stat: { alignItems: "center" },
-  statNum: { fontSize: 20, fontWeight: "800" },
-  statLabel: { fontSize: 10, color: "#444", marginTop: 4 },
-  statDivider: { width: 1, height: 32, backgroundColor: "#1A1A1A" },
-  weakRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
-  weakLabel: { color: "#888", fontSize: 13 },
-  weakPct: { fontSize: 12, fontWeight: "700" },
-  barTrack: { height: 4, backgroundColor: "#161616", borderRadius: 2, overflow: "hidden" },
-  barFill: { height: "100%", borderRadius: 2 },
-  badgeGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-  badgeItem: { width: "22%", alignItems: "center", gap: 5 },
-  badgeIcon: { width: 44, height: 44, borderRadius: 12, backgroundColor: "#161616", alignItems: "center", justifyContent: "center", borderWidth: 1 },
-  badgeName: { fontSize: 8, color: "#666", textAlign: "center", fontWeight: "700" },
-  tipCard: { marginTop: 12, backgroundColor: "#0A0A0A", borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12 },
-  tipText: { fontSize: 13, color: "#888", lineHeight: 20, flex: 1 },
-});
