@@ -3,7 +3,7 @@ import { Text } from "react-native";
 
 function TabIcon({ symbol, focused }: { symbol: string; focused: boolean }) {
   return (
-    <Text style={{ fontSize: 20, opacity: focused ? 1 : 0.4 }}>{symbol}</Text>
+    <Text style={{ fontSize: 20, color: focused ? "#C9A96E" : "#666" }}>{symbol}</Text>
   );
 }
 
