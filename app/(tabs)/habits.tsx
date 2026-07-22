@@ -73,6 +73,11 @@ export default function Habits() {
     const next = { ...checked, [id]: !checked[id] };
     setChecked(next);
     await storage.set(`lm_checked_${todayKey()}`, next);
+
+    const completed = Object.values(next).filter(Boolean).length;
+    const score = habits.length > 0 ? Math.round((completed / habits.length) * 100) : 0;
+    const hist = await storage.get("lm_history", {});
+    await storage.set("lm_history", { ...hist, [todayKey()]: score });
   };
 
   const addHabit = async () => {

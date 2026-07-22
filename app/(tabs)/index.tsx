@@ -1,6 +1,7 @@
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useCallback, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
+import { useFocusEffect } from "@react-navigation/native";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, TIPS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
@@ -189,53 +190,60 @@ export default function Dashboard() {
   const [range, setRange]                 = useState<Range>("week");
   const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const habitsData = await storage.get("lm_habits", DEFAULT_HABITS);
-        const checked    = await storage.get(`lm_checked_${todayKey()}`, {});
-        const g          = await storage.get("lm_goals", DEFAULT_GOALS);
-        const h          = await storage.get("lm_history", {});
-        const s          = await storage.get("lm_stats", DEFAULT_STATS);
+  useFocusEffect(
+    useCallback(() => {
+      const load = async () => {
+        try {
+          const habitsData = await storage.get("lm_habits", DEFAULT_HABITS);
+          const checked    = await storage.get(`lm_checked_${todayKey()}`, {});
+          const g          = await storage.get("lm_goals", DEFAULT_GOALS);
+          const h          = await storage.get("lm_history", {});
+          const s          = await storage.get("lm_stats", DEFAULT_STATS);
 
-        const habitsArr  = Array.isArray(habitsData) ? habitsData : DEFAULT_HABITS;
-        const checkedObj = checked && typeof checked === "object" ? checked : {};
-        const goalsArr   = Array.isArray(g) ? g : DEFAULT_GOALS;
-        const historyObj = h && typeof h === "object" ? h : {};
-        const statsObj   = s && typeof s === "object" ? { ...DEFAULT_STATS, ...s } : DEFAULT_STATS;
+          const habitsArr  = Array.isArray(habitsData) ? habitsData : DEFAULT_HABITS;
+          const checkedObj = checked && typeof checked === "object" ? checked : {};
+          const goalsArr   = Array.isArray(g) ? g : DEFAULT_GOALS;
+          const historyObj = h && typeof h === "object" ? h : {};
+          const statsObj   = s && typeof s === "object" ? { ...DEFAULT_STATS, ...s } : DEFAULT_STATS;
 
-        const completed = Object.values(checkedObj).filter(Boolean).length;
-        const sc = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
+          const completed = Object.values(checkedObj).filter(Boolean).length;
+          const sc = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
 
-        const counts: Record<string, number> = {};
-        const today = new Date();
-        for (let i = 0; i < 7; i++) {
-          const d = new Date(today);
-          d.setDate(today.getDate() - i);
-          const dc = await storage.get(`lm_checked_${d.toISOString().slice(0, 10)}`, {});
-          if (dc && typeof dc === "object") {
-            Object.entries(dc as Record<string, boolean>).forEach(([id, v]) => {
-              if (v) counts[id] = (counts[id] || 0) + 1;
-            });
+          if (historyObj[todayKey()] !== sc) {
+            historyObj[todayKey()] = sc;
+            await storage.set("lm_history", historyObj);
           }
-        }
 
-        setHabits(habitsArr);
-        setHabitsLen(habitsArr.length);
-        setCompletedToday(completed);
-        setScore(sc);
-        setGoals(goalsArr);
-        setHistory(historyObj);
-        setStats(statsObj);
-        setHabitCounts(counts);
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setLoaded(true);
-      }
-    };
-    load();
-  }, []);
+          const counts: Record<string, number> = {};
+          const today = new Date();
+          for (let i = 0; i < 7; i++) {
+            const d = new Date(today);
+            d.setDate(today.getDate() - i);
+            const dc = await storage.get(`lm_checked_${d.toISOString().slice(0, 10)}`, {});
+            if (dc && typeof dc === "object") {
+              Object.entries(dc as Record<string, boolean>).forEach(([id, v]) => {
+                if (v) counts[id] = (counts[id] || 0) + 1;
+              });
+            }
+          }
+
+          setHabits(habitsArr);
+          setHabitsLen(habitsArr.length);
+          setCompletedToday(completed);
+          setScore(sc);
+          setGoals(goalsArr);
+          setHistory(historyObj);
+          setStats(statsObj);
+          setHabitCounts(counts);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoaded(true);
+        }
+      };
+      load();
+    }, [])
+  );
 
   if (!loaded) {
     return (
