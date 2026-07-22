@@ -16,12 +16,12 @@ export const DEFAULT_HABITS = [
   ];
   
   export const RANKS = [
-    { min: 0,  max: 20,  label: "D",  color: "#666",    title: "Débutant" },
-    { min: 20, max: 40,  label: "C",  color: "#7B9EE0", title: "En progression" },
-    { min: 40, max: 60,  label: "B",  color: "#7ECC8A", title: "Sérieux" },
-    { min: 60, max: 75,  label: "A",  color: "#C9A96E", title: "Elite" },
-    { min: 75, max: 90,  label: "S",  color: "#E07B5A", title: "Top 10%" },
-    { min: 90, max: 101, label: "SS", color: "#F0D090", title: "GODMODE" },
+    { min: 0,  max: 20,  label: "Incel",    color: "#666",    title: "Débutant" },
+    { min: 20, max: 40,  label: "Normie",   color: "#7B9EE0", title: "En progression" },
+    { min: 40, max: 60,  label: "HTN",      color: "#7ECC8A", title: "Sérieux" },
+    { min: 60, max: 75,  label: "Chadlite", color: "#C9A96E", title: "Elite" },
+    { min: 75, max: 90,  label: "Chad",     color: "#E07B5A", title: "Top 10%" },
+    { min: 90, max: 101, label: "Gigachad", color: "#F0D090", title: "GODMODE" },
   ];
   
   export const BADGES = [

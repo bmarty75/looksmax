@@ -133,8 +133,8 @@ function makeStyles(c: ThemeColors) {
     headerTitle:   { fontSize: 24, fontWeight: "800", color: c.text },
     headerRight:   { flexDirection: "row", gap: 10, alignItems: "center" },
     themeBtn:      { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    rankBadge:     { width: 48, height: 48, borderRadius: 24, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    rankLabel:     { fontSize: 16, fontWeight: "800" },
+    rankBadge:     { minWidth: 48, height: 32, paddingHorizontal: 10, borderRadius: 16, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
+    rankLabel:     { fontSize: 12, fontWeight: "800" },
     card:          { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: 20 },
     cardTitle:     { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700" },
     chartHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
@@ -320,7 +320,7 @@ export default function Dashboard() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: rank.color }]}>{rank.label}</Text>
+            <Text style={[styles.statNum, { color: rank.color, fontSize: rank.label.length > 4 ? 15 : 20 }]}>{rank.label}</Text>
             <Text style={styles.statLabel}>Rang</Text>
           </View>
         </View>
