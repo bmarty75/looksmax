@@ -12,6 +12,40 @@ const CHART_H = 80;
 const CHART_PT = 8;
 const CHART_PB = 4;
 
+// ─── Score hardcore : régularité > coup d'un jour ────────────
+// 20% jour même, 40% streak (max à 60 jours), 40% moyenne 30 jours
+const STREAK_MAX_DAYS = 60;
+const AVG_WINDOW_DAYS = 30;
+
+function computeCurrentStreak(history: Record<string, number>): number {
+  const d = new Date();
+  if ((history[d.toISOString().slice(0, 10)] || 0) <= 0) {
+    d.setDate(d.getDate() - 1); // grâce : le jour en cours n'est pas encore terminé
+  }
+  let streak = 0;
+  while ((history[d.toISOString().slice(0, 10)] || 0) > 0) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function compute30DayAvg(history: Record<string, number>): number {
+  const d = new Date();
+  let sum = 0;
+  for (let i = 0; i < AVG_WINDOW_DAYS; i++) {
+    sum += history[d.toISOString().slice(0, 10)] || 0;
+    d.setDate(d.getDate() - 1);
+  }
+  return sum / AVG_WINDOW_DAYS;
+}
+
+function computeCompositeScore(todayPct: number, streak: number, avg30: number): number {
+  const streakComponent = Math.min(streak / STREAK_MAX_DAYS, 1) * 100;
+  const raw = 0.2 * todayPct + 0.4 * streakComponent + 0.4 * avg30;
+  return Math.max(0, Math.min(100, Math.round(raw)));
+}
+
 type Range = "week" | "month" | "year" | "all";
 const RANGES: { key: Range; label: string }[] = [
   { key: "week",  label: "7J"   },
@@ -187,6 +221,7 @@ export default function Dashboard() {
   const [habitsLen, setHabitsLen]         = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
   const [habitCounts, setHabitCounts]     = useState<Record<string, number>>({});
+  const [streak, setStreak]               = useState(0);
   const [range, setRange]                 = useState<Range>("week");
   const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
 
@@ -207,12 +242,16 @@ export default function Dashboard() {
           const statsObj   = s && typeof s === "object" ? { ...DEFAULT_STATS, ...s } : DEFAULT_STATS;
 
           const completed = Object.values(checkedObj).filter(Boolean).length;
-          const sc = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
+          const todayPct  = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
 
-          if (historyObj[todayKey()] !== sc) {
-            historyObj[todayKey()] = sc;
+          if (historyObj[todayKey()] !== todayPct) {
+            historyObj[todayKey()] = todayPct;
             await storage.set("lm_history", historyObj);
           }
+
+          const currentStreak = computeCurrentStreak(historyObj);
+          const avg30 = compute30DayAvg(historyObj);
+          const sc = computeCompositeScore(todayPct, currentStreak, avg30);
 
           const counts: Record<string, number> = {};
           const today = new Date();
@@ -231,6 +270,7 @@ export default function Dashboard() {
           setHabitsLen(habitsArr.length);
           setCompletedToday(completed);
           setScore(sc);
+          setStreak(currentStreak);
           setGoals(goalsArr);
           setHistory(historyObj);
           setStats(statsObj);
@@ -253,10 +293,10 @@ export default function Dashboard() {
     );
   }
 
-  const rank = getRank(score);
+  const rank = getRank(score, streak);
   const circ = 2 * Math.PI * 54;
   const offset = circ - (score / 100) * circ;
-  const unlockedBadges = BADGES.filter(b => b.condition(stats));
+  const unlockedBadges = BADGES.filter(b => b.condition({ ...stats, streak }));
 
   const weakHabits = habits
     .map(h => ({ ...h, rate: Math.round(((habitCounts[h.id] || 0) / 7) * 100) }))
@@ -310,7 +350,7 @@ export default function Dashboard() {
         </View>
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#E07B5A" }]}>{stats.streak ?? 0}🔥</Text>
+            <Text style={[styles.statNum, { color: "#E07B5A" }]}>{streak}🔥</Text>
             <Text style={styles.statLabel}>Streak</Text>
           </View>
           <View style={styles.statDivider} />

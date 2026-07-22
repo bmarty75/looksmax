@@ -16,12 +16,12 @@ export const DEFAULT_HABITS = [
   ];
   
   export const RANKS = [
-    { min: 0,  max: 20,  label: "Incel",    color: "#666",    title: "Débutant" },
-    { min: 20, max: 40,  label: "Normie",   color: "#7B9EE0", title: "En progression" },
-    { min: 40, max: 60,  label: "HTN",      color: "#7ECC8A", title: "Sérieux" },
-    { min: 60, max: 75,  label: "Chadlite", color: "#C9A96E", title: "Elite" },
-    { min: 75, max: 90,  label: "Chad",     color: "#E07B5A", title: "Top 10%" },
-    { min: 90, max: 101, label: "Gigachad", color: "#F0D090", title: "GODMODE" },
+    { min: 0,  max: 20,  label: "Incel",    color: "#666",    title: "Débutant",       streakReq: 0  },
+    { min: 20, max: 40,  label: "Normie",   color: "#7B9EE0", title: "En progression", streakReq: 0  },
+    { min: 40, max: 60,  label: "HTN",      color: "#7ECC8A", title: "Sérieux",        streakReq: 0  },
+    { min: 60, max: 75,  label: "Chadlite", color: "#C9A96E", title: "Elite",          streakReq: 0  },
+    { min: 75, max: 90,  label: "Chad",     color: "#E07B5A", title: "Top 10%",        streakReq: 14 },
+    { min: 90, max: 101, label: "Gigachad", color: "#F0D090", title: "GODMODE",        streakReq: 30 },
   ];
   
   export const BADGES = [
@@ -50,7 +50,11 @@ export const DEFAULT_HABITS = [
   export const COLORS = ["#C9A96E","#E07B5A","#7B9EE0","#5AC4D4","#7ECC8A","#B07ECC","#CC9B7E","#E0C55A","#E07BB0","#7BE0C4"];
   export const CATEGORIES = ["skin","body","nutrition","recovery","mental","custom"];
   
-  export const getRank = (score: number) =>
-    RANKS.find((r) => score >= r.min && score < r.max) || RANKS[0];
+  export const getRank = (score: number, streak: number = 0) => {
+    let idx = RANKS.findIndex((r) => score >= r.min && score < r.max);
+    if (idx === -1) idx = 0;
+    while (idx > 0 && streak < RANKS[idx].streakReq) idx--;
+    return RANKS[idx];
+  };
   
   export const todayKey = () => new Date().toISOString().slice(0, 10);
