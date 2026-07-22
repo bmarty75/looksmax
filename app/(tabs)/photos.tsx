@@ -85,13 +85,8 @@ export default function Photos() {
   };
 
   const deletePhoto = async (id: number) => {
-    Alert.alert("Supprimer", "Supprimer cette photo ?", [
-      { text: "Annuler", style: "cancel" },
-      { text: "Supprimer", style: "destructive", onPress: async () => {
-        await savePhotos(photos.filter((p: any) => p.id !== id));
-        setSelected(null);
-      }},
-    ]);
+    await savePhotos(photos.filter((p: any) => p.id !== id));
+    setSelected(null);
   };
 
   const imgSize = (width - 48) / 2;
