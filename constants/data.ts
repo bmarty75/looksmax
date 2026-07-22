@@ -36,14 +36,46 @@ export const DEFAULT_HABITS = [
   ];
   
   export const TIPS = [
-    "Double cleanse le soir pour maximiser l'absorption",
-    "La vitamine C le matin, le rétinol le soir",
-    "8h de sommeil = meilleure skin que n'importe quelle crème",
-    "Boire de l'eau en priorité au réveil",
-    "La posture change ton visage en 6 semaines",
-    "Mâche lentement pour muscler les masséters",
-    "La crème solaire est le meilleur anti-âge",
-    "Un déficit calorique modéré = face gains garantis",
+    // Peau (skincare)
+    "La crème solaire est le meilleur anti-âge, mets-en tous les jours",
+    "Vitamine C le matin, rétinol le soir",
+    "Double cleanse le soir pour bien nettoyer la peau",
+    "Ne touche pas ton visage dans la journée",
+    "Hydrate ta peau matin et soir, même si elle est grasse",
+    "Change ta taie d'oreiller 2 fois par semaine",
+    "Bois de l'eau, la peau déshydratée vieillit plus vite",
+    // Corps (body)
+    "Un déficit calorique modéré révèle les traits du visage",
+    "Muscle ton cou et tes trapèzes pour une silhouette plus imposante",
+    "Travaille tes épaules pour élargir le haut du corps",
+    "La posture change ta silhouette instantanément",
+    "Redresse-toi : épaules en arrière, menton légèrement rentré",
+    // Visage (facial)
+    "Mâche lentement pour développer les masséters (mâchoire)",
+    "Le mewing (langue au palais) améliore la posture linguale",
+    "Réduis le sel pour limiter la rétention d'eau au visage",
+    "Dors sur le dos pour éviter l'asymétrie et les marques",
+    // Sommeil & récup
+    "8h de sommeil = meilleure peau que n'importe quelle crème",
+    "Couche-toi avant minuit, la récup est meilleure",
+    "Coupe les écrans 30 min avant de dormir",
+    "Une chambre fraîche améliore la qualité du sommeil",
+    // Grooming
+    "Trouve une coupe adaptée à ta forme de visage",
+    "Entretiens tes sourcils, ça structure le regard",
+    "Garde une barbe nette ou rase de près, pas d'entre-deux",
+    "Ongles propres et coupés, ça se remarque",
+    "Une bonne odeur laisse une impression forte",
+    // Nutrition
+    "Protéines à chaque repas pour la peau et les muscles",
+    "Réduis le sucre, il accélère le vieillissement (glycation)",
+    "Oméga-3 (poissons gras) pour une peau saine",
+    "Limite l'alcool, il gonfle le visage et abîme la peau",
+    // Mental / lifestyle
+    "La confiance se voit plus que n'importe quel trait",
+    "Souris, ça rend instantanément plus attirant",
+    "Le contact visuel renforce ta présence",
+    "Gère ton stress, le cortisol abîme peau et sommeil",
   ];
   
   export const ICONS = ["✨","💪","🌙","💧","🥩","🧍","✂️","☀️","🏃","🧘","🫀","🦷","💊","🧴","🧠","🎯","🏋️","🚴","🥗","🍎"];

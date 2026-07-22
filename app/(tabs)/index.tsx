@@ -223,7 +223,17 @@ export default function Dashboard() {
   const [habitCounts, setHabitCounts]     = useState<Record<string, number>>({});
   const [streak, setStreak]               = useState(0);
   const [range, setRange]                 = useState<Range>("week");
-  const [tip] = useState(TIPS[Math.floor(Math.random() * TIPS.length)]);
+  const [tip, setTip]                     = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
+      const tipInterval = setInterval(() => {
+        setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
+      }, 15000);
+      return () => clearInterval(tipInterval);
+    }, [])
+  );
 
   useFocusEffect(
     useCallback(() => {
