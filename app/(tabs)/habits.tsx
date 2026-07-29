@@ -1,8 +1,10 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo, useEffect, useState } from "react";
 import {
   FlatList, Modal, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
@@ -77,6 +79,7 @@ export default function Habits() {
   const [form, setForm] = useState({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayKey());
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
 
   useEffect(() => {
     storage.get("lm_habits", DEFAULT_HABITS).then(h => {
@@ -124,6 +127,7 @@ export default function Habits() {
 
   const deleteHabit = async (id: string) => {
     await saveHabits(habits.filter(h => h.id !== id));
+    setDeleteTarget(null);
   };
 
   const completedCount = Object.values(checked).filter(Boolean).length;
@@ -261,13 +265,21 @@ export default function Habits() {
                   {checked[h.id] && <Text style={{ color: "#000", fontSize: 12, fontWeight: "900" }}>✓</Text>}
                 </View>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => deleteHabit(h.id)}>
-                <Text style={{ fontSize: 16 }}>🗑️</Text>
+              <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteTarget({ id: h.id, label: h.label })}>
+                <MaterialIcons name="delete-outline" size={20} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
           ))}
         </View>
       ))}
+
+      <ConfirmDialog
+        visible={!!deleteTarget}
+        title="Supprimer cette habitude ?"
+        message={deleteTarget ? `"${deleteTarget.label}" et son historique de suivi seront définitivement supprimés.` : ""}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteHabit(deleteTarget.id)}
+      />
     </ScrollView>
   );
 }

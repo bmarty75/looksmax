@@ -1,8 +1,10 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo, useEffect, useState } from "react";
 import {
   ScrollView, StyleSheet, Text, TextInput,
   TouchableOpacity, View,
 } from "react-native";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { COLORS, DEFAULT_GOALS, ICONS } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
@@ -51,6 +53,7 @@ export default function Goals() {
   const [goals, setGoals]     = useState<any[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ label: "", target: "30", unit: "j", icon: "🎯", color: "#B07ECC" });
+  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
 
   useEffect(() => {
     storage.get("lm_goals", DEFAULT_GOALS).then((g: any) => setGoals(Array.isArray(g) ? g : DEFAULT_GOALS));
@@ -80,6 +83,7 @@ export default function Goals() {
 
   const deleteGoal = async (id: string) => {
     await saveGoals(goals.filter((g: any) => g.id !== id));
+    setDeleteTarget(null);
   };
 
   const UNITS = ["j", "kg", "%", "km", "rep", "h", "L"];
@@ -192,13 +196,21 @@ export default function Goals() {
               <TouchableOpacity style={[styles.goalBtn, { borderColor: g.color, flex: 2 }]} onPress={() => updateProgress(g.id, 1)}>
                 <Text style={[styles.goalBtnText, { color: g.color }]}>+1 {g.unit}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={[styles.goalBtn, { borderColor: "#E07B5A44" }]} onPress={() => deleteGoal(g.id)}>
-                <Text style={[styles.goalBtnText, { color: "#E07B5A" }]}>🗑️</Text>
+              <TouchableOpacity style={[styles.goalBtn, { borderColor: "#E07B5A44" }]} onPress={() => setDeleteTarget({ id: g.id, label: g.label })}>
+                <MaterialIcons name="delete-outline" size={18} color="#E07B5A" />
               </TouchableOpacity>
             </View>
           </View>
         );
       })}
+
+      <ConfirmDialog
+        visible={!!deleteTarget}
+        title="Supprimer cet objectif ?"
+        message={deleteTarget ? `"${deleteTarget.label}" et sa progression seront définitivement supprimés.` : ""}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={() => deleteTarget && deleteGoal(deleteTarget.id)}
+      />
     </ScrollView>
   );
 }

@@ -1,9 +1,11 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import * as ImagePicker from "expo-image-picker";
 import { useMemo, useEffect, useState } from "react";
 import {
   Alert, Dimensions, Image, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
+import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { storage } from "../../hooks/useStorage";
 
@@ -31,7 +33,7 @@ function makeStyles(c: ThemeColors) {
     lightboxClose: { position: "absolute", top: 60, right: 20 },
     lightboxImg:   { width: "100%", height: 400, borderRadius: 16 },
     lightboxDate:  { color: "#555", fontSize: 12, letterSpacing: 1, marginTop: 12, fontWeight: "700" },
-    deleteBtn:     { marginTop: 20, backgroundColor: "#E07B5A22", borderWidth: 1, borderColor: "#E07B5A44", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12 },
+    deleteBtn:     { marginTop: 20, backgroundColor: "#E07B5A22", borderWidth: 1, borderColor: "#E07B5A44", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 8 },
     deleteBtnText: { color: "#E07B5A", fontSize: 14, fontWeight: "700" },
   });
 }
@@ -42,6 +44,7 @@ export default function Photos() {
 
   const [photos, setPhotos]     = useState<any[]>([]);
   const [selected, setSelected] = useState<any>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   useEffect(() => {
     storage.get("lm_photos", []).then(setPhotos);
@@ -86,6 +89,7 @@ export default function Photos() {
 
   const deletePhoto = async (id: number) => {
     await savePhotos(photos.filter((p: any) => p.id !== id));
+    setConfirmingDelete(false);
     setSelected(null);
   };
 
@@ -143,13 +147,22 @@ export default function Photos() {
             <>
               <Image source={{ uri: selected.uri }} style={styles.lightboxImg} resizeMode="contain" />
               <Text style={styles.lightboxDate}>{selected.date}</Text>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => deletePhoto(selected.id)}>
-                <Text style={styles.deleteBtnText}>🗑️ Supprimer</Text>
+              <TouchableOpacity style={styles.deleteBtn} onPress={() => setConfirmingDelete(true)}>
+                <MaterialIcons name="delete-outline" size={16} color="#E07B5A" />
+                <Text style={styles.deleteBtnText}>Supprimer</Text>
               </TouchableOpacity>
             </>
           )}
         </View>
       </Modal>
+
+      <ConfirmDialog
+        visible={confirmingDelete}
+        title="Supprimer cette photo ?"
+        message="Cette photo sera définitivement supprimée de ta progression."
+        onCancel={() => setConfirmingDelete(false)}
+        onConfirm={() => selected && deletePhoto(selected.id)}
+      />
     </ScrollView>
   );
 }
