@@ -306,7 +306,10 @@ export default function Dashboard() {
   const rank = getRank(score, streak);
   const circ = 2 * Math.PI * 54;
   const offset = circ - (score / 100) * circ;
-  const unlockedBadges = BADGES.filter(b => b.condition({ ...stats, streak }));
+
+  const totalChecked = Object.values(history).filter(v => v > 0).length;
+  const perfectDays   = Object.values(history).filter(v => v === 100).length;
+  const unlockedBadges = BADGES.filter(b => b.condition({ ...stats, streak, totalChecked, perfectDays, rank: rank.label }));
 
   const weakHabits = habits
     .map(h => ({ ...h, rate: Math.round(((habitCounts[h.id] || 0) / 7) * 100) }))

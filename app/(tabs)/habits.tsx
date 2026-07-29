@@ -7,6 +7,22 @@ import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 
+const MONTHS_SHORT = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
+
+function shiftDateKey(key: string, delta: number): string {
+  const d = new Date(key);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(key: string): string {
+  if (key === todayKey()) return "Aujourd'hui";
+  if (key === shiftDateKey(todayKey(), -1)) return "Hier";
+  const d = new Date(key);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  return `${day} ${MONTHS_SHORT[d.getUTCMonth()]}`;
+}
+
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     root:           { flex: 1, backgroundColor: c.bg, paddingHorizontal: 16 },
@@ -41,6 +57,13 @@ function makeStyles(c: ThemeColors) {
     habitLabel:     { flex: 1, fontSize: 15, color: c.text, fontWeight: "500" },
     checkbox:       { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
     deleteBtn:      { paddingHorizontal: 14, paddingVertical: 14, borderLeftWidth: 1, borderLeftColor: c.border2 },
+    dateNav:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+    dateNavBtn:      { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
+    dateNavBtnDisabled: { opacity: 0.25 },
+    dateLabelWrap:  { alignItems: "center" },
+    dateLabel:      { fontSize: 15, fontWeight: "800", color: c.text },
+    dateLabelPast:  { color: "#7B9EE0" },
+    dateSubLabel:   { fontSize: 9, letterSpacing: 2, color: c.textFaint, fontWeight: "700", marginTop: 2 },
   });
 }
 
@@ -53,31 +76,43 @@ export default function Habits() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(todayKey());
 
   useEffect(() => {
-    const load = async () => {
-      const h = await storage.get("lm_habits", DEFAULT_HABITS);
-      const c = await storage.get(`lm_checked_${todayKey()}`, {});
+    storage.get("lm_habits", DEFAULT_HABITS).then(h => {
       setHabits(Array.isArray(h) ? h : DEFAULT_HABITS);
-      setChecked(c && typeof c === "object" ? c : {});
-    };
-    load();
+    });
   }, []);
+
+  useEffect(() => {
+    storage.get(`lm_checked_${selectedDate}`, {}).then(c => {
+      setChecked(c && typeof c === "object" ? c : {});
+    });
+  }, [selectedDate]);
 
   const saveHabits = async (h: any[]) => {
     setHabits(h);
     await storage.set("lm_habits", h);
   };
 
+  const goToPrevDay = () => setSelectedDate(d => shiftDateKey(d, -1));
+  const goToNextDay = () => setSelectedDate(d => (d === todayKey() ? d : shiftDateKey(d, 1)));
+
   const toggle = async (id: string) => {
     const next = { ...checked, [id]: !checked[id] };
     setChecked(next);
-    await storage.set(`lm_checked_${todayKey()}`, next);
+    await storage.set(`lm_checked_${selectedDate}`, next);
 
     const completed = Object.values(next).filter(Boolean).length;
     const score = habits.length > 0 ? Math.round((completed / habits.length) * 100) : 0;
     const hist = await storage.get("lm_history", {});
-    await storage.set("lm_history", { ...hist, [todayKey()]: score });
+    await storage.set("lm_history", { ...hist, [selectedDate]: score });
+
+    if (id === "water") {
+      const s = await storage.get("lm_stats", { waterCount: 0 });
+      const delta = next[id] ? 1 : -1;
+      await storage.set("lm_stats", { ...s, waterCount: Math.max(0, (s.waterCount || 0) + delta) });
+    }
   };
 
   const addHabit = async () => {
@@ -91,8 +126,9 @@ export default function Habits() {
     await saveHabits(habits.filter(h => h.id !== id));
   };
 
-  const completedToday = Object.values(checked).filter(Boolean).length;
+  const completedCount = Object.values(checked).filter(Boolean).length;
   const categories = [...new Set(habits.map(h => h.category))];
+  const isToday = selectedDate === todayKey();
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
@@ -101,13 +137,30 @@ export default function Habits() {
         <Text style={styles.headerTitle}>Habitudes</Text>
       </View>
 
+      <View style={styles.dateNav}>
+        <TouchableOpacity style={styles.dateNavBtn} onPress={goToPrevDay}>
+          <Text style={{ color: colors.textSub, fontSize: 16 }}>‹</Text>
+        </TouchableOpacity>
+        <View style={styles.dateLabelWrap}>
+          <Text style={[styles.dateLabel, !isToday && styles.dateLabelPast]}>{formatDateLabel(selectedDate)}</Text>
+          {!isToday && <Text style={styles.dateSubLabel}>MODIFIER CE JOUR</Text>}
+        </View>
+        <TouchableOpacity
+          style={[styles.dateNavBtn, isToday && styles.dateNavBtnDisabled]}
+          onPress={goToNextDay}
+          disabled={isToday}
+        >
+          <Text style={{ color: colors.textSub, fontSize: 16 }}>›</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={{ marginBottom: 16 }}>
         <Text style={styles.progressText}>
-          <Text style={{ color: "#C9A96E", fontWeight: "700" }}>{completedToday}</Text>
+          <Text style={{ color: "#C9A96E", fontWeight: "700" }}>{completedCount}</Text>
           /{habits.length} complétées
         </Text>
         <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${habits.length > 0 ? (completedToday / habits.length) * 100 : 0}%` as any }]} />
+          <View style={[styles.progressFill, { width: `${habits.length > 0 ? (completedCount / habits.length) * 100 : 0}%` as any }]} />
         </View>
       </View>
 

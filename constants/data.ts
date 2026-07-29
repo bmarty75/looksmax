@@ -32,7 +32,7 @@ export const DEFAULT_HABITS = [
     { id: "hydrated",     icon: "💧", label: "Hydraté",       desc: "Eau cochée 10 fois",        condition: (s: any) => s.waterCount >= 10 },
     { id: "glowup",       icon: "🌟", label: "Glow Up",       desc: "Ajoute une photo",          condition: (s: any) => (s.photos || 0) >= 1 },
     { id: "goal_getter",  icon: "🎯", label: "Goal Getter",   desc: "Crée 3 objectifs",          condition: (s: any) => s.goalsCreated >= 3 },
-    { id: "godmode",      icon: "🔱", label: "GODMODE",       desc: "Rang SS atteint",           condition: (s: any) => s.avgScore >= 90 },
+    { id: "godmode",      icon: "🔱", label: "GODMODE",       desc: "Rang Gigachad atteint",     condition: (s: any) => s.rank === "Gigachad" },
   ];
   
   export const TIPS = [
