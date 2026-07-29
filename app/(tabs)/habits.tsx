@@ -82,7 +82,19 @@ export default function Habits() {
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [isTouchDevice, setIsTouchDevice] = useState(true);
   const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    // Sur web, Platform.OS reste "web" aussi bien sur téléphone que sur ordinateur :
+    // on distingue via le type de pointeur pour garder l'appui long sur mobile
+    // et ne réserver le clic droit qu'aux vraies souris.
+    if (Platform.OS === "web" && typeof window !== "undefined" && window.matchMedia) {
+      setIsTouchDevice(window.matchMedia("(pointer: coarse)").matches);
+    } else {
+      setIsTouchDevice(true);
+    }
+  }, []);
 
   useEffect(() => {
     storage.get("lm_habits", DEFAULT_HABITS).then(h => {
@@ -279,14 +291,14 @@ export default function Habits() {
                 borderColor: checked[h.id] ? h.color : colors.border2,
                 backgroundColor: checked[h.id] ? `${h.color}18` : colors.card,
               }]}
-              {...(Platform.OS === "web"
+              {...(Platform.OS === "web" && !isTouchDevice
                 ? { onContextMenu: (e: any) => { e.preventDefault(); openEditForm(h); } }
                 : {})}
             >
               <TouchableOpacity
                 style={styles.habitLeft}
                 onPress={() => toggle(h.id)}
-                onLongPress={Platform.OS === "web" ? undefined : () => openEditForm(h)}
+                onLongPress={Platform.OS === "web" && !isTouchDevice ? undefined : () => openEditForm(h)}
                 delayLongPress={400}
               >
                 <View style={[styles.habitIcon, { backgroundColor: `${h.color}20` }]}>
