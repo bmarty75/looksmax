@@ -1,5 +1,5 @@
-import { useMemo, useCallback, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useMemo, useCallback, useRef, useState } from "react";
+import { Animated, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
@@ -197,7 +197,7 @@ function makeStyles(c: ThemeColors) {
     badgeItem:     { width: "22%", alignItems: "center", gap: 5 },
     badgeIcon:     { width: 44, height: 44, borderRadius: 12, backgroundColor: c.surface, alignItems: "center", justifyContent: "center", borderWidth: 1 },
     badgeName:     { fontSize: 8, color: c.textSub, textAlign: "center", fontWeight: "700" },
-    tipCard:       { marginTop: 12, backgroundColor: c.card, borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12 },
+    tipCard:       { marginTop: 12, backgroundColor: c.card, borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12, overflow: "hidden" },
     tipText:       { fontSize: 13, color: c.textSub, lineHeight: 20, flex: 1 },
   });
 }
@@ -224,15 +224,29 @@ export default function Dashboard() {
   const [streak, setStreak]               = useState(0);
   const [range, setRange]                 = useState<Range>("week");
   const [tip, setTip]                     = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
+  const tipOpacity = useRef(new Animated.Value(1)).current;
+  const tipSlide   = useRef(new Animated.Value(0)).current;
+
+  const swooshToNewTip = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(tipOpacity, { toValue: 0, duration: 150, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(tipSlide,   { toValue: -24, duration: 150, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
+    ]).start(() => {
+      setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
+      tipSlide.setValue(24);
+      Animated.parallel([
+        Animated.timing(tipOpacity, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+        Animated.timing(tipSlide,   { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      ]).start();
+    });
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
-      setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
-      const tipInterval = setInterval(() => {
-        setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
-      }, 15000);
+      swooshToNewTip();
+      const tipInterval = setInterval(swooshToNewTip, 15000);
       return () => clearInterval(tipInterval);
-    }, [])
+    }, [swooshToNewTip])
   );
 
   useFocusEffect(
@@ -497,7 +511,9 @@ export default function Dashboard() {
       {/* Tip */}
       <View style={styles.tipCard}>
         <Text style={{ fontSize: 18 }}>💡</Text>
-        <Text style={styles.tipText}>{tip}</Text>
+        <Animated.View style={{ flex: 1, opacity: tipOpacity, transform: [{ translateX: tipSlide }] }}>
+          <Text style={styles.tipText}>{tip}</Text>
+        </Animated.View>
       </View>
     </ScrollView>
   );

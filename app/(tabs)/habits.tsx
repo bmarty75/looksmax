@@ -1,7 +1,7 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import {
-  FlatList, Modal, ScrollView, StyleSheet, Text,
+  FlatList, Modal, Platform, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
@@ -37,6 +37,7 @@ function makeStyles(c: ThemeColors) {
     addHabitBtn:    { backgroundColor: "#C9A96E11", borderWidth: 1, borderColor: "#C9A96E44", borderStyle: "dashed", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 16 },
     addHabitBtnText:{ color: "#C9A96E", fontSize: 13, fontWeight: "700", letterSpacing: 1 },
     formCard:       { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 16, marginBottom: 16, gap: 12 },
+    formTitle:      { fontSize: 13, fontWeight: "800", color: c.text, marginBottom: 2 },
     formRow:        { flexDirection: "row", gap: 10, alignItems: "center" },
     formLabel:      { fontSize: 11, color: c.textMuted, fontWeight: "700", letterSpacing: 1, minWidth: 70 },
     iconPick:       { width: 48, height: 48, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border2, borderRadius: 10, alignItems: "center", justifyContent: "center" },
@@ -80,6 +81,8 @@ export default function Habits() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayKey());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     storage.get("lm_habits", DEFAULT_HABITS).then(h => {
@@ -118,11 +121,34 @@ export default function Habits() {
     }
   };
 
-  const addHabit = async () => {
-    if (!form.label.trim()) return;
-    await saveHabits([...habits, { id: `h_${Date.now()}`, ...form }]);
+  const resetForm = () => {
     setForm({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
+    setEditingId(null);
     setShowForm(false);
+  };
+
+  const openNewForm = () => {
+    if (showForm) { resetForm(); return; }
+    setForm({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
+    setEditingId(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (h: any) => {
+    setForm({ label: h.label, icon: h.icon, category: h.category, color: h.color });
+    setEditingId(h.id);
+    setShowForm(true);
+    scrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const saveHabit = async () => {
+    if (!form.label.trim()) return;
+    if (editingId) {
+      await saveHabits(habits.map(h => h.id === editingId ? { ...h, ...form } : h));
+    } else {
+      await saveHabits([...habits, { id: `h_${Date.now()}`, ...form }]);
+    }
+    resetForm();
   };
 
   const deleteHabit = async (id: string) => {
@@ -135,7 +161,7 @@ export default function Habits() {
   const isToday = selectedDate === todayKey();
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
+    <ScrollView ref={scrollRef} style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
       <View style={styles.header}>
         <Text style={styles.headerSub}>LOOKSMAX OS</Text>
         <Text style={styles.headerTitle}>Habitudes</Text>
@@ -168,12 +194,13 @@ export default function Habits() {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.addHabitBtn} onPress={() => setShowForm(!showForm)}>
+      <TouchableOpacity style={styles.addHabitBtn} onPress={openNewForm}>
         <Text style={styles.addHabitBtnText}>{showForm ? "✕ Annuler" : "+ Nouvelle habitude"}</Text>
       </TouchableOpacity>
 
       {showForm && (
         <View style={styles.formCard}>
+          <Text style={styles.formTitle}>{editingId ? "Modifier l'habitude" : "Nouvelle habitude"}</Text>
           <View style={styles.formRow}>
             <TouchableOpacity style={styles.iconPick} onPress={() => setPickerOpen(true)}>
               <Text style={{ fontSize: 22 }}>{form.icon}</Text>
@@ -215,8 +242,8 @@ export default function Habits() {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.confirmBtn} onPress={addHabit}>
-            <Text style={styles.confirmBtnText}>Créer l'habitude</Text>
+          <TouchableOpacity style={styles.confirmBtn} onPress={saveHabit}>
+            <Text style={styles.confirmBtnText}>{editingId ? "Enregistrer" : "Créer l'habitude"}</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -252,8 +279,16 @@ export default function Habits() {
                 borderColor: checked[h.id] ? h.color : colors.border2,
                 backgroundColor: checked[h.id] ? `${h.color}18` : colors.card,
               }]}
+              {...(Platform.OS === "web"
+                ? { onContextMenu: (e: any) => { e.preventDefault(); openEditForm(h); } }
+                : {})}
             >
-              <TouchableOpacity style={styles.habitLeft} onPress={() => toggle(h.id)}>
+              <TouchableOpacity
+                style={styles.habitLeft}
+                onPress={() => toggle(h.id)}
+                onLongPress={Platform.OS === "web" ? undefined : () => openEditForm(h)}
+                delayLongPress={400}
+              >
                 <View style={[styles.habitIcon, { backgroundColor: `${h.color}20` }]}>
                   <Text style={{ fontSize: 18 }}>{h.icon}</Text>
                 </View>
