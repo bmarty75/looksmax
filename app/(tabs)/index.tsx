@@ -1,7 +1,9 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useMemo, useCallback, useRef, useState } from "react";
 import { Animated, Easing, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
+import { useAuth } from "../../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, RANKS, TIPS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
@@ -213,6 +215,12 @@ function makeStyles(c: ThemeColors) {
     rankYouTag:       { fontSize: 8, fontWeight: "800", letterSpacing: 1, backgroundColor: "#C9A96E", color: "#000", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, overflow: "hidden" },
     rankModalClose:   { marginTop: 6, alignItems: "center", padding: 12 },
     rankModalCloseText: { fontSize: 13, fontWeight: "700" },
+    accountOverlay:   { flex: 1, backgroundColor: "#000a", alignItems: "center", justifyContent: "center", padding: 24 },
+    accountCard:      { width: "100%", maxWidth: 330, backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 18, padding: 20 },
+    accountEmail:     { fontSize: 15, fontWeight: "800", textAlign: "center" },
+    accountHint:      { fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: 8, marginBottom: 18 },
+    accountSignOut:   { borderWidth: 1, borderColor: "#E07B5A55", backgroundColor: "#E07B5A18", borderRadius: 12, padding: 14, alignItems: "center" },
+    accountSignOutText: { color: "#E07B5A", fontSize: 13, fontWeight: "800" },
   });
 }
 
@@ -238,6 +246,8 @@ export default function Dashboard() {
   const [streak, setStreak]               = useState(0);
   const [range, setRange]                 = useState<Range>("week");
   const [rankModalOpen, setRankModalOpen] = useState(false);
+  const [accountModalOpen, setAccountModalOpen] = useState(false);
+  const { email, signOut } = useAuth();
   const [tip, setTip]                     = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
   const tipOpacity = useRef(new Animated.Value(1)).current;
   const tipSlide   = useRef(new Animated.Value(0)).current;
@@ -363,6 +373,9 @@ export default function Dashboard() {
           <Text style={styles.headerTitle}>Dashboard</Text>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity style={styles.themeBtn} onPress={() => setAccountModalOpen(true)}>
+            <MaterialIcons name="person-outline" size={18} color={colors.textSub} />
+          </TouchableOpacity>
           <TouchableOpacity style={styles.themeBtn} onPress={toggle}>
             <Text style={{ fontSize: 15 }}>{mode === "dark" ? "☀️" : "🌙"}</Text>
           </TouchableOpacity>
@@ -575,6 +588,27 @@ export default function Dashboard() {
               })}
             </ScrollView>
             <TouchableOpacity style={styles.rankModalClose} onPress={() => setRankModalOpen(false)}>
+              <Text style={[styles.rankModalCloseText, { color: colors.textSub }]}>Fermer</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal visible={accountModalOpen} transparent animationType="fade" onRequestClose={() => setAccountModalOpen(false)}>
+        <TouchableOpacity style={styles.accountOverlay} activeOpacity={1} onPress={() => setAccountModalOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.accountCard}>
+            <Text style={styles.rankModalTitle}>MON COMPTE</Text>
+            <Text style={[styles.accountEmail, { color: colors.text }]}>{email ?? "—"}</Text>
+            <Text style={[styles.accountHint, { color: colors.textMuted }]}>
+              Ta progression est sauvegardée en ligne et se retrouve sur tous tes appareils.
+            </Text>
+            <TouchableOpacity
+              style={styles.accountSignOut}
+              onPress={async () => { setAccountModalOpen(false); await signOut(); }}
+            >
+              <Text style={styles.accountSignOutText}>Se déconnecter</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.rankModalClose} onPress={() => setAccountModalOpen(false)}>
               <Text style={[styles.rankModalCloseText, { color: colors.textSub }]}>Fermer</Text>
             </TouchableOpacity>
           </TouchableOpacity>
