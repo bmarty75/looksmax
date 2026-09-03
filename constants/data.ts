@@ -15,13 +15,18 @@ export const DEFAULT_HABITS = [
     { id: "g3", label: "Skincare routine", target: 21, unit: "j", icon: "✨", color: "#5AC4D4", progress: 14 },
   ];
   
+  // Échelle PSL (1–10). `min`/`max` = plage du score de régularité (0–100),
+  // `streakReq` = streak minimum exigé en plus du score pour débloquer le palier.
   export const RANKS = [
-    { min: 0,  max: 20,  label: "Incel",    color: "#666",    title: "Débutant",       streakReq: 0  },
-    { min: 20, max: 40,  label: "Normie",   color: "#7B9EE0", title: "En progression", streakReq: 0  },
-    { min: 40, max: 60,  label: "HTN",      color: "#7ECC8A", title: "Sérieux",        streakReq: 0  },
-    { min: 60, max: 75,  label: "Chadlite", color: "#C9A96E", title: "Elite",          streakReq: 0  },
-    { min: 75, max: 90,  label: "Chad",     color: "#E07B5A", title: "Top 10%",        streakReq: 14 },
-    { min: 90, max: 101, label: "Gigachad", color: "#F0D090", title: "GODMODE",        streakReq: 30 },
+    { min: 0,   max: 15,  label: "Sub-3",     psl: "< 3",   pop: "~5%",           color: "#5A5A5A", desc: "Traits structurels très défavorables",        streakReq: 0   },
+    { min: 15,  max: 30,  label: "Sub-5",     psl: "3–4.5", pop: "~20%",          color: "#8A8A8A", desc: "Nettement sous la moyenne, défauts visibles", streakReq: 0   },
+    { min: 30,  max: 45,  label: "LTN",       psl: "4.5–5", pop: "~25%",          color: "#7B9EE0", desc: "Low Tier Normie, un peu sous la moyenne",     streakReq: 0   },
+    { min: 45,  max: 60,  label: "MTN",       psl: "5–5.5", pop: "~30%",          color: "#5AC4D4", desc: "Mid Tier Normie, la vraie moyenne",           streakReq: 0   },
+    { min: 60,  max: 72,  label: "HTN",       psl: "6–6.5", pop: "~15%",          color: "#7ECC8A", desc: "Au-dessus de la moyenne, bonne harmonie",     streakReq: 0   },
+    { min: 72,  max: 84,  label: "Chadlite",  psl: "7–7.5", pop: "top 5%",        color: "#C9A96E", desc: "Clairement attirant",                         streakReq: 21  },
+    { min: 84,  max: 92,  label: "Chad",      psl: "8–9",   pop: "top 1%",        color: "#E07B5A", desc: "Dominance sociale + physique",                streakReq: 45  },
+    { min: 92,  max: 100, label: "Gigachad",  psl: "9–9.5", pop: "top 0.1%",      color: "#F0D090", desc: "Outlier",                                     streakReq: 60  },
+    { min: 100, max: 101, label: "True Adam", psl: "10",    pop: "1/10 milliards", color: "#B07ECC", desc: "Purement théorique",                         streakReq: 365 },
   ];
   
   export const BADGES = [
@@ -32,7 +37,7 @@ export const DEFAULT_HABITS = [
     { id: "hydrated",     icon: "💧", label: "Hydraté",       desc: "Eau cochée 10 fois",        condition: (s: any) => s.waterCount >= 10 },
     { id: "glowup",       icon: "🌟", label: "Glow Up",       desc: "Ajoute une photo",          condition: (s: any) => (s.photos || 0) >= 1 },
     { id: "goal_getter",  icon: "🎯", label: "Goal Getter",   desc: "Crée 3 objectifs",          condition: (s: any) => s.goalsCreated >= 3 },
-    { id: "godmode",      icon: "🔱", label: "GODMODE",       desc: "Rang Gigachad atteint",     condition: (s: any) => s.rank === "Gigachad" },
+    { id: "godmode",      icon: "🔱", label: "GODMODE",       desc: "Rang Gigachad atteint",     condition: (s: any) => ["Gigachad", "True Adam"].includes(s.rank) },
   ];
   
   export const TIPS = [

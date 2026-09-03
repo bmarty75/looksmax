@@ -1,9 +1,9 @@
 import { useMemo, useCallback, useRef, useState } from "react";
-import { Animated, Easing, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Animated, Easing, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, TIPS, getRank, todayKey } from "../../constants/data";
+import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, RANKS, TIPS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 
 // ─── Chart constants ──────────────────────────────────────────
@@ -199,6 +199,20 @@ function makeStyles(c: ThemeColors) {
     badgeName:     { fontSize: 8, color: c.textSub, textAlign: "center", fontWeight: "700" },
     tipCard:       { marginTop: 12, backgroundColor: c.card, borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12, overflow: "hidden" },
     tipText:       { fontSize: 13, color: c.textSub, lineHeight: 20, flex: 1 },
+    rankModalOverlay: { flex: 1, backgroundColor: "#000a", justifyContent: "flex-end" },
+    rankModalCard:    { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34, maxHeight: "80%" },
+    rankModalTitle:   { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700", textAlign: "center", marginBottom: 16 },
+    rankRow:          { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 14, marginBottom: 10 },
+    rankRowActive:    { backgroundColor: "#C9A96E11" },
+    rankDot:          { width: 14, height: 14, borderRadius: 7, marginRight: 14 },
+    rankRowLabel:     { fontSize: 15, fontWeight: "800" },
+    rankRowTitle:     { fontSize: 11, marginTop: 1 },
+    rankRowRange:     { fontSize: 13, fontWeight: "800" },
+    rankRowPop:       { fontSize: 9, fontWeight: "700", marginTop: 2 },
+    rankRowStreak:    { fontSize: 9, fontWeight: "700", marginTop: 3, letterSpacing: 0.5 },
+    rankYouTag:       { fontSize: 8, fontWeight: "800", letterSpacing: 1, backgroundColor: "#C9A96E", color: "#000", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, overflow: "hidden" },
+    rankModalClose:   { marginTop: 6, alignItems: "center", padding: 12 },
+    rankModalCloseText: { fontSize: 13, fontWeight: "700" },
   });
 }
 
@@ -223,9 +237,12 @@ export default function Dashboard() {
   const [habitCounts, setHabitCounts]     = useState<Record<string, number>>({});
   const [streak, setStreak]               = useState(0);
   const [range, setRange]                 = useState<Range>("week");
+  const [rankModalOpen, setRankModalOpen] = useState(false);
   const [tip, setTip]                     = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
   const tipOpacity = useRef(new Animated.Value(1)).current;
   const tipSlide   = useRef(new Animated.Value(0)).current;
+  const rankListRef    = useRef<ScrollView>(null);
+  const rankRowOffsets = useRef<Record<string, number>>({});
 
   const swooshToNewTip = useCallback(() => {
     Animated.parallel([
@@ -349,9 +366,9 @@ export default function Dashboard() {
           <TouchableOpacity style={styles.themeBtn} onPress={toggle}>
             <Text style={{ fontSize: 15 }}>{mode === "dark" ? "☀️" : "🌙"}</Text>
           </TouchableOpacity>
-          <View style={[styles.rankBadge, { borderColor: rank.color }]}>
+          <TouchableOpacity style={[styles.rankBadge, { borderColor: rank.color }]} onPress={() => setRankModalOpen(true)}>
             <Text style={[styles.rankLabel, { color: rank.color }]}>{rank.label}</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -372,7 +389,7 @@ export default function Dashboard() {
           <View style={styles.ringCenter}>
             <Text style={[styles.ringScore, { color: rank.color }]}>{score}</Text>
             <Text style={styles.ringSubLabel}>SCORE</Text>
-            <Text style={[styles.rankTitle, { color: rank.color }]}>{rank.title}</Text>
+            <Text style={[styles.rankTitle, { color: rank.color }]}>PSL {rank.psl}</Text>
           </View>
         </View>
         <View style={styles.statsRow}>
@@ -386,10 +403,10 @@ export default function Dashboard() {
             <Text style={styles.statLabel}>Aujourd'hui</Text>
           </View>
           <View style={styles.statDivider} />
-          <View style={styles.stat}>
+          <TouchableOpacity style={styles.stat} onPress={() => setRankModalOpen(true)}>
             <Text style={[styles.statNum, { color: rank.color, fontSize: rank.label.length > 4 ? 15 : 20 }]}>{rank.label}</Text>
             <Text style={styles.statLabel}>Rang</Text>
-          </View>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -515,6 +532,54 @@ export default function Dashboard() {
           <Text style={styles.tipText}>{tip}</Text>
         </Animated.View>
       </View>
+
+      <Modal visible={rankModalOpen} transparent animationType="slide" onRequestClose={() => setRankModalOpen(false)}>
+        <TouchableOpacity style={styles.rankModalOverlay} activeOpacity={1} onPress={() => setRankModalOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.rankModalCard}>
+            <Text style={styles.rankModalTitle}>ÉCHELLE PSL</Text>
+            <ScrollView
+              ref={rankListRef}
+              onContentSizeChange={() => {
+                // amène le rang courant dans le champ de vision à l'ouverture
+                const y = rankRowOffsets.current[rank.label];
+                if (y != null) rankListRef.current?.scrollTo({ y: Math.max(0, y - 70), animated: false });
+              }}
+            >
+              {RANKS.map(r => {
+                const isCurrent = r.label === rank.label;
+                const maxDisplay = r.max > 100 ? 100 : r.max - 1;
+                return (
+                  <View
+                    key={r.label}
+                    onLayout={e => { rankRowOffsets.current[r.label] = e.nativeEvent.layout.y; }}
+                    style={[styles.rankRow, { borderColor: isCurrent ? r.color : colors.border }, isCurrent && styles.rankRowActive]}
+                  >
+                    <View style={[styles.rankDot, { backgroundColor: r.color }]} />
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Text style={[styles.rankRowLabel, { color: r.color }]}>{r.label}</Text>
+                        {isCurrent && <Text style={styles.rankYouTag}>TOI</Text>}
+                      </View>
+                      <Text style={[styles.rankRowTitle, { color: colors.textMuted }]}>{r.desc}</Text>
+                      <Text style={[styles.rankRowStreak, { color: colors.textFaint }]}>
+                        SCORE {r.min === maxDisplay ? r.min : `${r.min}–${maxDisplay}`}
+                        {r.streakReq > 0 ? ` · STREAK ${r.streakReq}J` : ""}
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: "flex-end", marginLeft: 8 }}>
+                      <Text style={[styles.rankRowRange, { color: r.color }]}>{r.psl}</Text>
+                      <Text style={[styles.rankRowPop, { color: colors.textFaint }]}>{r.pop}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <TouchableOpacity style={styles.rankModalClose} onPress={() => setRankModalOpen(false)}>
+              <Text style={[styles.rankModalCloseText, { color: colors.textSub }]}>Fermer</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </ScrollView>
   );
 }
