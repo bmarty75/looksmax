@@ -40,6 +40,7 @@ interface AuthCtx {
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signUp: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
+  changePassword: (current: string, next: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthCtx>({
@@ -50,6 +51,7 @@ const AuthContext = createContext<AuthCtx>({
   signIn: async () => ({ ok: false, message: null }),
   signUp: async () => ({ ok: false, message: null }),
   signOut: async () => {},
+  changePassword: async () => ({ ok: false, message: null }),
 });
 
 /** Traduit les messages d'erreur Supabase, qui sont en anglais. */
@@ -172,6 +174,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   };
 
+  const changePassword = async (current: string, next: string): Promise<AuthResult> => {
+    const adresse = session?.user?.email;
+    if (!adresse) return { ok: false, message: "Session expirée, reconnecte-toi." };
+
+    try {
+      // Supabase autorise le changement avec la seule session ouverte : on
+      // revérifie le mot de passe actuel pour qu'un appareil déverrouillé
+      // laissé sans surveillance ne suffise pas à verrouiller le compte.
+      const { error: erreurVerif } = await supabase.auth.signInWithPassword({
+        email: adresse,
+        password: current,
+      });
+      if (erreurVerif) {
+        const m = erreurVerif.message.toLowerCase();
+        if (m.includes("invalid login credentials")) {
+          return { ok: false, message: "Mot de passe actuel incorrect." };
+        }
+        return { ok: false, message: traduireErreur(erreurVerif.message) };
+      }
+
+      const { error } = await supabase.auth.updateUser({ password: next });
+      if (error) {
+        const m = error.message.toLowerCase();
+        if (m.includes("should be different")) {
+          return { ok: false, message: "Le nouveau mot de passe doit être différent de l'actuel." };
+        }
+        return { ok: false, message: traduireErreur(error.message) };
+      }
+      return { ok: true, message: "Mot de passe modifié." };
+    } catch {
+      return { ok: false, message: "Connexion au serveur impossible." };
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -182,6 +218,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signIn,
         signUp,
         signOut,
+        changePassword,
       }}
     >
       {children}

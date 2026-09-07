@@ -5,11 +5,13 @@ interface Props {
   visible: boolean;
   title: string;
   message: string;
+  /** Libellé du bouton d'action ; « Supprimer » par défaut. */
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }
 
-export function ConfirmDialog({ visible, title, message, onCancel, onConfirm }: Props) {
+export function ConfirmDialog({ visible, title, message, confirmLabel = "Supprimer", onCancel, onConfirm }: Props) {
   const { colors } = useTheme();
 
   return (
@@ -23,7 +25,7 @@ export function ConfirmDialog({ visible, title, message, onCancel, onConfirm }: 
               <Text style={[styles.btnText, { color: colors.textSub }]}>Annuler</Text>
             </TouchableOpacity>
             <TouchableOpacity style={[styles.btn, styles.deleteBtn]} onPress={onConfirm}>
-              <Text style={[styles.btnText, { color: "#fff" }]}>Supprimer</Text>
+              <Text style={[styles.btnText, { color: "#fff" }]}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
         </View>
