@@ -1,13 +1,14 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router";
 import { useMemo, useEffect, useState } from "react";
 import {
-  Alert, Dimensions, Image, Modal, ScrollView,
+  Dimensions, Image, Modal, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { storage } from "../../hooks/useStorage";
+import { Photo, PhotoPick, choisirPhoto, grouperParMois, prendrePhoto } from "../../lib/photos";
 
 const { width } = Dimensions.get("window");
 
@@ -23,6 +24,9 @@ function makeStyles(c: ThemeColors) {
     emptyState:    { alignItems: "center", paddingTop: 60, paddingBottom: 40 },
     emptyText:     { color: c.textFaint, fontSize: 14, textAlign: "center", lineHeight: 24 },
     sectionLabel:  { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700", marginBottom: 12 },
+    compareBtn:    { backgroundColor: "#C9A96E", borderRadius: 12, padding: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, marginBottom: 22 },
+    compareText:   { color: "#000", fontSize: 14, fontWeight: "800" },
+    erreur:        { fontSize: 12, color: "#E07B5A", textAlign: "center", marginBottom: 14, fontWeight: "600" },
     photoGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 10 },
     photoItem:     { borderRadius: 14, overflow: "hidden", backgroundColor: c.surface },
     photoThumb:    { width: "100%", height: "100%" },
@@ -42,53 +46,38 @@ export default function Photos() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [photos, setPhotos]     = useState<any[]>([]);
-  const [selected, setSelected] = useState<any>(null);
+  const router = useRouter();
+  const [photos, setPhotos]     = useState<Photo[]>([]);
+  const [selected, setSelected] = useState<Photo | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [erreur, setErreur]     = useState<string | null>(null);
 
   useEffect(() => {
-    storage.get("lm_photos", []).then(setPhotos);
+    storage.get("lm_photos", []).then(p => setPhotos(Array.isArray(p) ? p : []));
   }, []);
 
-  const savePhotos = async (p: any[]) => {
+  const savePhotos = async (p: Photo[]) => {
     setPhotos(p);
     await storage.set("lm_photos", p);
   };
 
-  const pickImage = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permission requise", "Active l'accès à ta galerie dans les réglages.");
+  /** Ajoute la photo réduite renvoyée par le module, et met à jour le compteur. */
+  const ajouter = async (pick: PhotoPick) => {
+    if (!pick.ok) {
+      if (pick.message) setErreur(pick.message);
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, quality: 0.7 });
-    if (!result.canceled) {
-      const entry = { id: Date.now(), date: new Date().toLocaleDateString("fr-FR"), uri: result.assets[0].uri };
-      const updated = [entry, ...photos];
-      await savePhotos(updated);
-      const s = await storage.get("lm_stats", { photos: 0 });
-      await storage.set("lm_stats", { ...s, photos: (s.photos || 0) + 1 });
-    }
+    setErreur(null);
+    await savePhotos([pick.photo, ...photos]);
+    const s = await storage.get("lm_stats", { photos: 0 });
+    await storage.set("lm_stats", { ...s, photos: (s.photos || 0) + 1 });
   };
 
-  const takePhoto = async () => {
-    const perm = await ImagePicker.requestCameraPermissionsAsync();
-    if (!perm.granted) {
-      Alert.alert("Permission requise", "Active l'accès à la caméra dans les réglages.");
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({ quality: 0.7 });
-    if (!result.canceled) {
-      const entry = { id: Date.now(), date: new Date().toLocaleDateString("fr-FR"), uri: result.assets[0].uri };
-      const updated = [entry, ...photos];
-      await savePhotos(updated);
-      const s = await storage.get("lm_stats", { photos: 0 });
-      await storage.set("lm_stats", { ...s, photos: (s.photos || 0) + 1 });
-    }
-  };
+  const pickImage = async () => ajouter(await choisirPhoto());
+  const takePhoto = async () => ajouter(await prendrePhoto());
 
   const deletePhoto = async (id: number) => {
-    await savePhotos(photos.filter((p: any) => p.id !== id));
+    await savePhotos(photos.filter(p => p.id !== id));
     setConfirmingDelete(false);
     setSelected(null);
   };
@@ -113,29 +102,40 @@ export default function Photos() {
         </TouchableOpacity>
       </View>
 
+      {erreur && <Text style={styles.erreur}>{erreur}</Text>}
+
+      {photos.length >= 2 && (
+        <TouchableOpacity style={styles.compareBtn} onPress={() => router.push("/compare")}>
+          <MaterialIcons name="compare" size={17} color="#000" />
+          <Text style={styles.compareText}>Comparer avant / après</Text>
+        </TouchableOpacity>
+      )}
+
       {photos.length === 0 ? (
         <View style={styles.emptyState}>
           <Text style={{ fontSize: 52, marginBottom: 16 }}>📸</Text>
           <Text style={styles.emptyText}>Ajoute ta première photo{"\n"}pour tracker ton glow up !</Text>
         </View>
       ) : (
-        <>
-          <Text style={styles.sectionLabel}>AVANT / APRÈS ({photos.length} photos)</Text>
-          <View style={styles.photoGrid}>
-            {photos.map((ph: any) => (
-              <TouchableOpacity
-                key={ph.id}
-                style={[styles.photoItem, { width: imgSize, height: imgSize * 1.3 }]}
-                onPress={() => setSelected(ph)}
-              >
-                <Image source={{ uri: ph.uri }} style={styles.photoThumb} />
-                <View style={styles.photoOverlay}>
-                  <Text style={styles.photoDate}>{ph.date}</Text>
-                </View>
-              </TouchableOpacity>
-            ))}
+        grouperParMois(photos).map(groupe => (
+          <View key={groupe.titre} style={{ marginBottom: 22 }}>
+            <Text style={styles.sectionLabel}>{groupe.titre} ({groupe.photos.length})</Text>
+            <View style={styles.photoGrid}>
+              {groupe.photos.map(ph => (
+                <TouchableOpacity
+                  key={ph.id}
+                  style={[styles.photoItem, { width: imgSize, height: imgSize * 1.3 }]}
+                  onPress={() => setSelected(ph)}
+                >
+                  <Image source={{ uri: ph.uri }} style={styles.photoThumb} />
+                  <View style={styles.photoOverlay}>
+                    <Text style={styles.photoDate}>{ph.date}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </>
+        ))
       )}
 
       <Modal visible={!!selected} transparent animationType="fade">
