@@ -24,8 +24,11 @@ export function ConfirmDialog({ visible, title, message, confirmLabel = "Supprim
             <TouchableOpacity style={[styles.btn, { borderColor: colors.border2 }]} onPress={onCancel}>
               <Text style={[styles.btnText, { color: colors.textSub }]}>Annuler</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.btn, styles.deleteBtn]} onPress={onConfirm}>
-              <Text style={[styles.btnText, { color: "#fff" }]}>{confirmLabel}</Text>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.coral, borderColor: colors.coral }]}
+              onPress={onConfirm}
+            >
+              <Text style={[styles.btnText, { color: "#101014" }]}>{confirmLabel}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -41,6 +44,6 @@ const styles = StyleSheet.create({
   message:   { fontSize: 13, lineHeight: 19, marginBottom: 18 },
   row:       { flexDirection: "row", gap: 10 },
   btn:       { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center" },
-  deleteBtn: { backgroundColor: "#E07B5A", borderColor: "#E07B5A" },
+
   btnText:   { fontSize: 13, fontWeight: "700" },
 });

@@ -19,16 +19,16 @@ function makeStyles(c: ThemeColors) {
     content:       { paddingHorizontal: 20, paddingBottom: 40 },
     header:        { paddingTop: 60, paddingBottom: 16, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 22 },
     backBtn:       { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    headerSub:     { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
+    headerSub:     { fontSize: 10, letterSpacing: 4, color: c.amber, fontWeight: "700", marginBottom: 4 },
     headerTitle:   { fontSize: 24, fontWeight: "800", color: c.text },
 
     avatarWrap:    { alignItems: "center", marginBottom: 26 },
-    avatar:        { width: 104, height: 104, borderRadius: 52, borderWidth: 2, borderColor: "#C9A96E", backgroundColor: c.surface, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+    avatar:        { width: 104, height: 104, borderRadius: 52, borderWidth: 2, borderColor: c.amber, backgroundColor: c.surface, alignItems: "center", justifyContent: "center", overflow: "hidden" },
     avatarImg:     { width: "100%", height: "100%" },
-    avatarInit:    { fontSize: 34, fontWeight: "800", color: "#C9A96E" },
-    avatarEdit:    { position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, backgroundColor: "#C9A96E", alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: c.bg },
+    avatarInit:    { fontSize: 34, fontWeight: "800", color: c.amber },
+    avatarEdit:    { position: "absolute", bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, backgroundColor: c.amber, alignItems: "center", justifyContent: "center", borderWidth: 3, borderColor: c.bg },
     avatarHint:    { fontSize: 11, color: c.textMuted, marginTop: 10 },
-    avatarRemove:  { fontSize: 11, color: "#E07B5A", fontWeight: "700", marginTop: 8, padding: 4 },
+    avatarRemove:  { fontSize: 11, color: c.coral, fontWeight: "700", marginTop: 8, padding: 4 },
 
     section:       { marginBottom: 26 },
     sectionTitle:  { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700", marginBottom: 12 },
@@ -40,23 +40,27 @@ function makeStyles(c: ThemeColors) {
     readonly:      { backgroundColor: c.surface, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 13, marginBottom: 16 },
     readonlyText:  { fontSize: 15, color: c.textMuted },
 
-    primaryBtn:    { backgroundColor: "#C9A96E", borderRadius: 12, padding: 15, alignItems: "center" },
-    primaryText:   { color: "#000", fontSize: 14, fontWeight: "800" },
-    primaryOff:    { opacity: 0.4 },
+    primaryBtn:    { backgroundColor: c.amber, borderRadius: 12, padding: 15, alignItems: "center" },
+    primaryText:   { color: c.onAmber, fontSize: 14, fontWeight: "800" },
+    primaryOff:    { backgroundColor: c.surface },
     secondaryBtn:  { borderWidth: 1, borderColor: c.border2, borderRadius: 12, padding: 15, alignItems: "center" },
     secondaryText: { color: c.textSub, fontSize: 13, fontWeight: "700" },
-    dangerBtn:     { borderWidth: 1, borderColor: "#E07B5A55", backgroundColor: "#E07B5A18", borderRadius: 12, padding: 15, alignItems: "center" },
-    dangerText:    { color: "#E07B5A", fontSize: 13, fontWeight: "800" },
+    dangerBtn:     { borderWidth: 1, borderColor: `${c.coral}55`, backgroundColor: `${c.coral}18`, borderRadius: 12, padding: 15, alignItems: "center" },
+    dangerText:    { color: c.coral, fontSize: 13, fontWeight: "800" },
 
     msg:           { fontSize: 12, textAlign: "center", marginBottom: 14, lineHeight: 18, fontWeight: "600" },
-    msgOk:         { color: "#7ECC8A" },
-    msgError:      { color: "#E07B5A" },
+    msgOk:         { color: c.green },
+    msgError:      { color: c.coral },
     separator:     { height: 1, backgroundColor: c.border, marginBottom: 24 },
+    themeRow:      { flexDirection: "row", gap: 10 },
+    themeBtn:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: c.border2, backgroundColor: c.card },
+    themeBtnOn:    { borderColor: `${c.amber}66`, backgroundColor: `${c.amber}14` },
+    themeTxt:      { fontSize: 13, fontWeight: "700", color: c.textSub },
   });
 }
 
 export default function ProfileScreen() {
-  const { colors } = useTheme();
+  const { colors, mode, toggle } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
   const { email, signOut, changePassword } = useAuth();
@@ -138,7 +142,7 @@ export default function ProfileScreen() {
   if (chargement) {
     return (
       <View style={[styles.root, { justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ color: "#C9A96E", fontSize: 32 }}>◈</Text>
+        <Text style={{ color: colors.amber, fontSize: 32 }}>◈</Text>
       </View>
     );
   }
@@ -161,7 +165,7 @@ export default function ProfileScreen() {
           <TouchableOpacity onPress={changerAvatar} disabled={avatarOccupe} activeOpacity={0.8}>
             <View style={styles.avatar}>
               {avatarOccupe ? (
-                <ActivityIndicator color="#C9A96E" />
+                <ActivityIndicator color={colors.amber} />
               ) : profile.avatar ? (
                 <Image source={{ uri: profile.avatar }} style={styles.avatarImg} />
               ) : (
@@ -169,7 +173,7 @@ export default function ProfileScreen() {
               )}
             </View>
             <View style={styles.avatarEdit}>
-              <MaterialIcons name="photo-camera" size={16} color="#000" />
+              <MaterialIcons name="photo-camera" size={16} color={colors.onAmber} />
             </View>
           </TouchableOpacity>
           <Text style={styles.avatarHint}>Touche la photo pour la changer</Text>
@@ -224,10 +228,38 @@ export default function ProfileScreen() {
             onPress={enregistrerProfil}
             disabled={!modifie}
           >
-            <Text style={styles.primaryText}>
+            <Text style={[styles.primaryText, !modifie && { color: colors.textMuted }]}>
               {modifie ? "Enregistrer les modifications" : "Aucune modification"}
             </Text>
           </TouchableOpacity>
+        </View>
+
+        <View style={styles.separator} />
+
+        {/* Apparence */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>APPARENCE</Text>
+          <View style={styles.themeRow}>
+            {([["dark", "Sombre", "dark-mode"], ["light", "Clair", "light-mode"]] as const).map(
+              ([valeur, libelle, icone]) => {
+                const actif = mode === valeur;
+                return (
+                  <TouchableOpacity
+                    key={valeur}
+                    style={[styles.themeBtn, actif && styles.themeBtnOn]}
+                    onPress={() => { if (!actif) toggle(); }}
+                  >
+                    <MaterialIcons
+                      name={icone}
+                      size={18}
+                      color={actif ? colors.amber : colors.textMuted}
+                    />
+                    <Text style={[styles.themeTxt, actif && { color: colors.amber }]}>{libelle}</Text>
+                  </TouchableOpacity>
+                );
+              },
+            )}
+          </View>
         </View>
 
         <View style={styles.separator} />

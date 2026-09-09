@@ -1,225 +1,284 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useMemo, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList, Modal, Platform, ScrollView, StyleSheet, Text,
   TextInput, TouchableOpacity, View,
 } from "react-native";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { BigButton, Card, Pill, SegmentBar } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { computeCurrentStreak, rangCourant } from "../../lib/metrics";
+import { loadProfile } from "../../lib/profile";
 
-const MONTHS_SHORT = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
+const MOIS_COURTS = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
 
-function shiftDateKey(key: string, delta: number): string {
-  const d = new Date(key);
+function decalerJour(cle: string, delta: number): string {
+  const d = new Date(cle);
   d.setUTCDate(d.getUTCDate() + delta);
   return d.toISOString().slice(0, 10);
 }
 
-function formatDateLabel(key: string): string {
-  if (key === todayKey()) return "Aujourd'hui";
-  if (key === shiftDateKey(todayKey(), -1)) return "Hier";
-  const d = new Date(key);
-  const day = String(d.getUTCDate()).padStart(2, "0");
-  return `${day} ${MONTHS_SHORT[d.getUTCMonth()]}`;
+function libelleJour(cle: string): string {
+  if (cle === todayKey()) return "Aujourd'hui";
+  if (cle === decalerJour(todayKey(), -1)) return "Hier";
+  const d = new Date(cle);
+  return `${String(d.getUTCDate()).padStart(2, "0")} ${MOIS_COURTS[d.getUTCMonth()]}`;
 }
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    root:           { flex: 1, backgroundColor: c.bg, paddingHorizontal: 16 },
-    header:         { paddingTop: 60, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 },
-    headerSub:      { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
-    headerTitle:    { fontSize: 24, fontWeight: "800", color: c.text },
-    progressText:   { fontSize: 13, color: c.textSub, marginBottom: 8 },
-    progressTrack:  { height: 3, backgroundColor: c.surface, borderRadius: 2, overflow: "hidden" },
-    progressFill:   { height: "100%", backgroundColor: "#C9A96E", borderRadius: 2 },
-    addHabitBtn:    { backgroundColor: "#C9A96E11", borderWidth: 1, borderColor: "#C9A96E44", borderStyle: "dashed", borderRadius: 12, padding: 14, alignItems: "center", marginBottom: 16 },
-    addHabitBtnText:{ color: "#C9A96E", fontSize: 13, fontWeight: "700", letterSpacing: 1 },
-    formCard:       { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 16, marginBottom: 16, gap: 12 },
-    formTitle:      { fontSize: 13, fontWeight: "800", color: c.text, marginBottom: 2 },
-    formRow:        { flexDirection: "row", gap: 10, alignItems: "center" },
-    formLabel:      { fontSize: 11, color: c.textMuted, fontWeight: "700", letterSpacing: 1, minWidth: 70 },
-    iconPick:       { width: 48, height: 48, backgroundColor: c.surface, borderWidth: 1, borderColor: c.border2, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    catChip:        { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, borderWidth: 1, borderColor: c.border2, marginRight: 8 },
-    catChipActive:  { borderColor: "#C9A96E44", backgroundColor: "#C9A96E11" },
-    catChipText:    { fontSize: 11, color: c.textMuted, fontWeight: "700" },
-    colorRow:       { flexDirection: "row", gap: 8, flexWrap: "wrap" },
-    colorDot:       { width: 22, height: 22, borderRadius: 11 },
-    input:          { backgroundColor: c.input, borderWidth: 1, borderColor: c.border2, borderRadius: 8, color: c.text, padding: 10, fontSize: 14 },
-    confirmBtn:     { backgroundColor: "#C9A96E", borderRadius: 10, padding: 14, alignItems: "center" },
-    confirmBtnText: { color: "#000", fontSize: 13, fontWeight: "700" },
-    modalOverlay:   { flex: 1, backgroundColor: "#000c", justifyContent: "flex-end" },
-    pickerModal:    { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, maxHeight: 400 },
-    pickerTitle:    { color: c.textSub, fontSize: 11, letterSpacing: 3, fontWeight: "700", textAlign: "center", marginBottom: 16 },
-    pickerCell:     { flex: 1, aspectRatio: 1, alignItems: "center", justifyContent: "center" },
-    catLabel:       { fontSize: 9, letterSpacing: 3, color: c.textFaint, fontWeight: "700", marginBottom: 8, paddingLeft: 4 },
-    habitCard:      { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, marginBottom: 8, overflow: "hidden" },
-    habitLeft:      { flex: 1, flexDirection: "row", alignItems: "center", gap: 14, padding: 14 },
-    habitIcon:      { width: 38, height: 38, borderRadius: 10, alignItems: "center", justifyContent: "center" },
-    habitLabel:     { flex: 1, fontSize: 15, color: c.text, fontWeight: "500" },
-    checkbox:       { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
-    deleteBtn:      { paddingHorizontal: 14, paddingVertical: 14, borderLeftWidth: 1, borderLeftColor: c.border2 },
-    dateNav:        { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
-    dateNavBtn:      { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    dateNavBtnDisabled: { opacity: 0.25 },
-    dateLabelWrap:  { alignItems: "center" },
-    dateLabel:      { fontSize: 15, fontWeight: "800", color: c.text },
-    dateLabelPast:  { color: "#7B9EE0" },
-    dateSubLabel:   { fontSize: 9, letterSpacing: 2, color: c.textFaint, fontWeight: "700", marginTop: 2 },
+    root:         { flex: 1, backgroundColor: c.bg },
+    content:      { paddingHorizontal: 16, paddingBottom: 30 },
+
+    statutHaut:   { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+    compteur:     { flexDirection: "row", alignItems: "flex-end", gap: 6, marginBottom: 14 },
+    compteurGros: { fontSize: 34, fontWeight: "800", color: c.text, lineHeight: 36 },
+    compteurBas:  { fontSize: 14, color: c.textSub, fontWeight: "600", marginBottom: 4 },
+    statutBas:    { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12 },
+    statutNote:   { fontSize: 11, color: c.textMuted },
+    statutGain:   { fontSize: 11, fontWeight: "800", color: c.amber },
+
+    dateNav:      { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 16, marginBottom: 16 },
+    navBtn:       { width: 34, height: 34, borderRadius: 17, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
+    dateLabel:    { fontSize: 14, fontWeight: "800", color: c.text },
+    dateSous:     { fontSize: 8.5, fontWeight: "700", letterSpacing: 1.4, color: c.textFaint, marginTop: 2, textAlign: "center" },
+
+    filtreRow:    { flexDirection: "row", alignItems: "center", gap: 10, marginBottom: 16 },
+    filtres:      { flexDirection: "row", gap: 8, paddingBottom: 4 },
+    ajoutRapide:  { width: 40, height: 40, borderRadius: 20, backgroundColor: c.cream, alignItems: "center", justifyContent: "center" },
+    filtre:       { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 9, borderRadius: 999, backgroundColor: c.card },
+    filtreTxt:    { fontSize: 12, fontWeight: "700", color: c.textSub },
+
+    carte:        { flexDirection: "row", alignItems: "center", gap: 13, backgroundColor: c.card, borderRadius: 18, padding: 14, marginBottom: 10 },
+    icone:        { width: 44, height: 44, borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    categorie:    { fontSize: 9, fontWeight: "800", letterSpacing: 0.8 },
+    duree:        { fontSize: 9, fontWeight: "700", color: c.textMuted },
+    titre:        { fontSize: 15, fontWeight: "700", color: c.text, marginTop: 3 },
+    sous:         { fontSize: 11.5, color: c.textMuted, marginTop: 2 },
+    coche:        { width: 40, height: 40, borderRadius: 20, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
+    supprimer:    { paddingLeft: 4, paddingVertical: 8 },
+
+    formCard:     { backgroundColor: c.card, borderRadius: 20, padding: 18, marginBottom: 16, gap: 13 },
+    formTitre:    { fontSize: 14, fontWeight: "800", color: c.text },
+    formLabel:    { fontSize: 9.5, fontWeight: "700", letterSpacing: 1.2, color: c.textFaint, minWidth: 66 },
+    formRow:      { flexDirection: "row", gap: 10, alignItems: "center" },
+    input:        { backgroundColor: c.input, borderRadius: 12, color: c.text, padding: 13, fontSize: 14 },
+    iconePick:    { width: 50, height: 50, borderRadius: 14, backgroundColor: c.surface, alignItems: "center", justifyContent: "center" },
+    chip:         { paddingHorizontal: 13, paddingVertical: 7, borderRadius: 999, backgroundColor: c.surface, marginRight: 8 },
+    chipTxt:      { fontSize: 11, fontWeight: "700", color: c.textMuted },
+    pastille:     { width: 24, height: 24, borderRadius: 12 },
+    valider:      { backgroundColor: c.cream, borderRadius: 14, padding: 15, alignItems: "center" },
+    validerTxt:   { color: "#101014", fontSize: 13, fontWeight: "800" },
+
+    modalFond:    { flex: 1, backgroundColor: "#000c", justifyContent: "flex-end" },
+    modalCarte:   { backgroundColor: c.card, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, maxHeight: 420 },
+    modalTitre:   { fontSize: 11, letterSpacing: 2, fontWeight: "700", color: c.textSub, textAlign: "center", marginBottom: 16 },
+    cellule:      { flex: 1, aspectRatio: 1, alignItems: "center", justifyContent: "center" },
   });
 }
 
-export default function Habits() {
+export default function Routines() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [habits, setHabits]   = useState<any[]>([]);
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
+  const [habits, setHabits]         = useState<any[]>([]);
+  const [checked, setChecked]       = useState<Record<string, boolean>>({});
+  const [history, setHistory]       = useState<Record<string, number>>({});
+  const [avatar, setAvatar]         = useState<string | null>(null);
+  const [jour, setJour]             = useState(todayKey());
+  const [filtre, setFiltre]         = useState<string>("tous");
+  const [showForm, setShowForm]     = useState(false);
+  const [form, setForm]             = useState({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
+  const [editId, setEditId]         = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(todayKey());
-  const [deleteTarget, setDeleteTarget] = useState<{ id: string; label: string } | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [isTouchDevice, setIsTouchDevice] = useState(true);
+  const [aSupprimer, setASupprimer] = useState<{ id: string; label: string } | null>(null);
+  const [tactile, setTactile]       = useState(true);
   const scrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
-    // Sur web, Platform.OS reste "web" aussi bien sur téléphone que sur ordinateur :
-    // on distingue via le type de pointeur pour garder l'appui long sur mobile
-    // et ne réserver le clic droit qu'aux vraies souris.
     if (Platform.OS === "web" && typeof window !== "undefined" && window.matchMedia) {
-      setIsTouchDevice(window.matchMedia("(pointer: coarse)").matches);
-    } else {
-      setIsTouchDevice(true);
+      setTactile(window.matchMedia("(pointer: coarse)").matches);
     }
   }, []);
 
-  useEffect(() => {
-    storage.get("lm_habits", DEFAULT_HABITS).then(h => {
-      setHabits(Array.isArray(h) ? h : DEFAULT_HABITS);
-    });
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      storage.get("lm_habits", DEFAULT_HABITS).then(h => setHabits(Array.isArray(h) ? h : DEFAULT_HABITS));
+      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      loadProfile().then(p => setAvatar(p.avatar));
+    }, []),
+  );
 
   useEffect(() => {
-    storage.get(`lm_checked_${selectedDate}`, {}).then(c => {
-      setChecked(c && typeof c === "object" ? c : {});
-    });
-  }, [selectedDate]);
+    storage.get(`lm_checked_${jour}`, {}).then(c => setChecked(c && typeof c === "object" ? c : {}));
+  }, [jour]);
 
-  const saveHabits = async (h: any[]) => {
-    setHabits(h);
-    await storage.set("lm_habits", h);
+  const enregistrer = async (liste: any[]) => {
+    setHabits(liste);
+    await storage.set("lm_habits", liste);
   };
 
-  const goToPrevDay = () => setSelectedDate(d => shiftDateKey(d, -1));
-  const goToNextDay = () => setSelectedDate(d => (d === todayKey() ? d : shiftDateKey(d, 1)));
+  const basculer = async (id: string) => {
+    const suivant = { ...checked, [id]: !checked[id] };
+    setChecked(suivant);
+    await storage.set(`lm_checked_${jour}`, suivant);
 
-  const toggle = async (id: string) => {
-    const next = { ...checked, [id]: !checked[id] };
-    setChecked(next);
-    await storage.set(`lm_checked_${selectedDate}`, next);
-
-    const completed = Object.values(next).filter(Boolean).length;
-    const score = habits.length > 0 ? Math.round((completed / habits.length) * 100) : 0;
+    const faits = Object.values(suivant).filter(Boolean).length;
+    const pct = habits.length > 0 ? Math.round((faits / habits.length) * 100) : 0;
     const hist = await storage.get("lm_history", {});
-    await storage.set("lm_history", { ...hist, [selectedDate]: score });
+    const maj = { ...hist, [jour]: pct };
+    await storage.set("lm_history", maj);
+    setHistory(maj);
 
     if (id === "water") {
       const s = await storage.get("lm_stats", { waterCount: 0 });
-      const delta = next[id] ? 1 : -1;
+      const delta = suivant[id] ? 1 : -1;
       await storage.set("lm_stats", { ...s, waterCount: Math.max(0, (s.waterCount || 0) + delta) });
     }
   };
 
-  const resetForm = () => {
+  const reinitForm = () => {
     setForm({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
-    setEditingId(null);
+    setEditId(null);
     setShowForm(false);
   };
 
-  const openNewForm = () => {
-    if (showForm) { resetForm(); return; }
+  const ouvrirCreation = () => {
+    if (showForm) { reinitForm(); return; }
     setForm({ label: "", icon: "🎯", category: "custom", color: COLORS[0] });
-    setEditingId(null);
+    setEditId(null);
     setShowForm(true);
   };
 
-  const openEditForm = (h: any) => {
+  const ouvrirEdition = (h: any) => {
     setForm({ label: h.label, icon: h.icon, category: h.category, color: h.color });
-    setEditingId(h.id);
+    setEditId(h.id);
     setShowForm(true);
     scrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
-  const saveHabit = async () => {
+  const valider = async () => {
     if (!form.label.trim()) return;
-    if (editingId) {
-      await saveHabits(habits.map(h => h.id === editingId ? { ...h, ...form } : h));
-    } else {
-      await saveHabits([...habits, { id: `h_${Date.now()}`, ...form }]);
-    }
-    resetForm();
+    if (editId) await enregistrer(habits.map(h => (h.id === editId ? { ...h, ...form } : h)));
+    else await enregistrer([...habits, { id: `h_${Date.now()}`, ...form }]);
+    reinitForm();
   };
 
-  const deleteHabit = async (id: string) => {
-    await saveHabits(habits.filter(h => h.id !== id));
-    setDeleteTarget(null);
+  const supprimer = async (id: string) => {
+    await enregistrer(habits.filter(h => h.id !== id));
+    setASupprimer(null);
   };
 
-  const completedCount = Object.values(checked).filter(Boolean).length;
+  const faits      = Object.values(checked).filter(Boolean).length;
+  const pct        = habits.length > 0 ? Math.round((faits / habits.length) * 100) : 0;
+  const streak     = computeCurrentStreak(history);
   const categories = [...new Set(habits.map(h => h.category))];
-  const isToday = selectedDate === todayKey();
+  const visibles   = filtre === "tous" ? habits : habits.filter(h => h.category === filtre);
+  const cejour     = jour === todayKey();
 
   return (
-    <ScrollView ref={scrollRef} style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
-      <View style={styles.header}>
-        <Text style={styles.headerSub}>LOOKSMAX OS</Text>
-        <Text style={styles.headerTitle}>Habitudes</Text>
-      </View>
+    <ScrollView ref={scrollRef} style={styles.root} contentContainerStyle={styles.content}>
+      <ScreenHeader section="Routines" avatar={avatar} rang={rangCourant(history)} />
 
+      {/* Statut du jour */}
+      <Card>
+        <View style={styles.statutHaut}>
+          <Pill color={pct > 0 ? colors.green : colors.textMuted} teinte={colors.surface} dot>
+            {pct > 0 ? "STATUT ACTIF" : "EN ATTENTE"}
+          </Pill>
+          <Pill color={colors.amber} teinte={colors.surface}>{streak}J STREAK 🔥</Pill>
+        </View>
+
+        <View style={styles.compteur}>
+          <Text style={styles.compteurGros}>{faits}</Text>
+          <Text style={styles.compteurBas}>/ {habits.length} complétées</Text>
+          <View style={{ flex: 1 }} />
+          <Pill color={colors.green} teinte={`${colors.green}1F`}>{pct}% COMPLÉTÉ</Pill>
+        </View>
+
+        <SegmentBar total={habits.length} done={faits} color={colors.green} />
+
+        <View style={styles.statutBas}>
+          <Text style={styles.statutNote}>
+            {cejour ? "Journée en cours" : `Journée du ${libelleJour(jour)}`}
+          </Text>
+          <Text style={styles.statutGain}>{habits.length - faits} restantes</Text>
+        </View>
+      </Card>
+
+      {/* Navigation par jour */}
       <View style={styles.dateNav}>
-        <TouchableOpacity style={styles.dateNavBtn} onPress={goToPrevDay}>
-          <Text style={{ color: colors.textSub, fontSize: 16 }}>‹</Text>
+        <TouchableOpacity style={styles.navBtn} onPress={() => setJour(j => decalerJour(j, -1))}>
+          <MaterialIcons name="chevron-left" size={22} color={colors.textSub} />
         </TouchableOpacity>
-        <View style={styles.dateLabelWrap}>
-          <Text style={[styles.dateLabel, !isToday && styles.dateLabelPast]}>{formatDateLabel(selectedDate)}</Text>
-          {!isToday && <Text style={styles.dateSubLabel}>MODIFIER CE JOUR</Text>}
+        <View style={{ alignItems: "center" }}>
+          <Text style={[styles.dateLabel, !cejour && { color: colors.amber }]}>{libelleJour(jour)}</Text>
+          {!cejour && <Text style={styles.dateSous}>MODIFIER CE JOUR</Text>}
         </View>
         <TouchableOpacity
-          style={[styles.dateNavBtn, isToday && styles.dateNavBtnDisabled]}
-          onPress={goToNextDay}
-          disabled={isToday}
+          style={[styles.navBtn, cejour && { opacity: 0.3 }]}
+          disabled={cejour}
+          onPress={() => setJour(j => (j === todayKey() ? j : decalerJour(j, 1)))}
         >
-          <Text style={{ color: colors.textSub, fontSize: 16 }}>›</Text>
+          <MaterialIcons name="chevron-right" size={22} color={colors.textSub} />
         </TouchableOpacity>
       </View>
 
-      <View style={{ marginBottom: 16 }}>
-        <Text style={styles.progressText}>
-          <Text style={{ color: "#C9A96E", fontWeight: "700" }}>{completedCount}</Text>
-          /{habits.length} complétées
-        </Text>
-        <View style={styles.progressTrack}>
-          <View style={[styles.progressFill, { width: `${habits.length > 0 ? (completedCount / habits.length) * 100 : 0}%` as any }]} />
+      {/* Filtres par catégorie, avec l'ajout rapide toujours visible à droite */}
+      <View style={styles.filtreRow}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+        <View style={styles.filtres}>
+          <TouchableOpacity
+            style={[styles.filtre, filtre === "tous" && { backgroundColor: colors.surface }]}
+            onPress={() => setFiltre("tous")}
+          >
+            {filtre === "tous" && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green }} />}
+            <Text style={[styles.filtreTxt, filtre === "tous" && { color: colors.text }]}>
+              Tous ({habits.length})
+            </Text>
+          </TouchableOpacity>
+          {categories.map(cat => {
+            const n = habits.filter(h => h.category === cat).length;
+            const actif = filtre === cat;
+            return (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.filtre, actif && { backgroundColor: colors.surface }]}
+                onPress={() => setFiltre(cat)}
+              >
+                {actif && <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.green }} />}
+                <Text style={[styles.filtreTxt, actif && { color: colors.text }]}>
+                  {cat.charAt(0).toUpperCase() + cat.slice(1)} ({n})
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
+      </ScrollView>
+        <TouchableOpacity
+          style={styles.ajoutRapide}
+          onPress={ouvrirCreation}
+          accessibilityLabel={showForm ? "Fermer le formulaire" : "Ajouter une routine"}
+        >
+          <MaterialIcons name={showForm ? "close" : "add"} size={22} color="#101014" />
+        </TouchableOpacity>
       </View>
 
-      <TouchableOpacity style={styles.addHabitBtn} onPress={openNewForm}>
-        <Text style={styles.addHabitBtnText}>{showForm ? "✕ Annuler" : "+ Nouvelle habitude"}</Text>
-      </TouchableOpacity>
-
+      {/* Formulaire */}
       {showForm && (
         <View style={styles.formCard}>
-          <Text style={styles.formTitle}>{editingId ? "Modifier l'habitude" : "Nouvelle habitude"}</Text>
+          <Text style={styles.formTitre}>{editId ? "Modifier la routine" : "Nouvelle routine"}</Text>
           <View style={styles.formRow}>
-            <TouchableOpacity style={styles.iconPick} onPress={() => setPickerOpen(true)}>
-              <Text style={{ fontSize: 22 }}>{form.icon}</Text>
+            <TouchableOpacity style={styles.iconePick} onPress={() => setPickerOpen(true)}>
+              <Text style={{ fontSize: 23 }}>{form.icon}</Text>
             </TouchableOpacity>
             <TextInput
               style={[styles.input, { flex: 1 }]}
-              placeholder="Nom de l'habitude..."
+              placeholder="Nom de la routine…"
               placeholderTextColor={colors.textFaint}
               value={form.label}
               onChangeText={t => setForm(f => ({ ...f, label: t }))}
@@ -227,105 +286,136 @@ export default function Habits() {
           </View>
 
           <View style={styles.formRow}>
-            <Text style={styles.formLabel}>Catégorie</Text>
+            <Text style={styles.formLabel}>CATÉGORIE</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {CATEGORIES.map(c => (
+              {CATEGORIES.map(cat => (
                 <TouchableOpacity
-                  key={c}
-                  onPress={() => setForm(f => ({ ...f, category: c }))}
-                  style={[styles.catChip, form.category === c && styles.catChipActive]}
+                  key={cat}
+                  onPress={() => setForm(f => ({ ...f, category: cat }))}
+                  style={[styles.chip, form.category === cat && { backgroundColor: `${colors.amber}26` }]}
                 >
-                  <Text style={[styles.catChipText, form.category === c && { color: "#C9A96E" }]}>{c}</Text>
+                  <Text style={[styles.chipTxt, form.category === cat && { color: colors.amber }]}>{cat}</Text>
                 </TouchableOpacity>
               ))}
             </ScrollView>
           </View>
 
           <View style={styles.formRow}>
-            <Text style={styles.formLabel}>Couleur</Text>
-            <View style={styles.colorRow}>
-              {COLORS.map(c => (
+            <Text style={styles.formLabel}>COULEUR</Text>
+            <View style={{ flexDirection: "row", gap: 9, flexWrap: "wrap", flex: 1 }}>
+              {COLORS.map(col => (
                 <TouchableOpacity
-                  key={c}
-                  onPress={() => setForm(f => ({ ...f, color: c }))}
-                  style={[styles.colorDot, { backgroundColor: c }, form.color === c && { borderWidth: 2, borderColor: "#fff" }]}
+                  key={col}
+                  onPress={() => setForm(f => ({ ...f, color: col }))}
+                  style={[
+                    styles.pastille,
+                    { backgroundColor: col },
+                    form.color === col && { borderWidth: 2.5, borderColor: colors.text },
+                  ]}
                 />
               ))}
             </View>
           </View>
 
-          <TouchableOpacity style={styles.confirmBtn} onPress={saveHabit}>
-            <Text style={styles.confirmBtnText}>{editingId ? "Enregistrer" : "Créer l'habitude"}</Text>
+          <TouchableOpacity style={styles.valider} onPress={valider}>
+            <Text style={styles.validerTxt}>{editId ? "Enregistrer" : "Créer la routine"}</Text>
           </TouchableOpacity>
         </View>
       )}
 
+      {/* Liste */}
+      {visibles.map(h => {
+        const coche = !!checked[h.id];
+        return (
+          <View
+            key={h.id}
+            style={styles.carte}
+            {...(Platform.OS === "web" && !tactile
+              ? { onContextMenu: (e: any) => { e.preventDefault(); ouvrirEdition(h); } }
+              : {})}
+          >
+            <View style={[styles.icone, { backgroundColor: `${h.color}1F` }]}>
+              <Text style={{ fontSize: 20 }}>{h.icon}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={{ flex: 1 }}
+              onPress={() => basculer(h.id)}
+              onLongPress={Platform.OS === "web" && !tactile ? undefined : () => ouvrirEdition(h)}
+              delayLongPress={400}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <Text style={[styles.categorie, { color: h.color }]}>
+                  {(h.category ?? "").toUpperCase()}
+                </Text>
+                <Text style={styles.duree}>•</Text>
+                <Text style={styles.duree}>{coche ? "Complétée" : "À faire"}</Text>
+              </View>
+              <Text style={styles.titre} numberOfLines={1}>{h.label}</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => basculer(h.id)}>
+              <View style={[
+                styles.coche,
+                coche
+                  ? { backgroundColor: colors.green, borderColor: colors.green }
+                  : { borderColor: colors.border2 },
+              ]}>
+                {coche && <MaterialIcons name="check" size={22} color="#101014" />}
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.supprimer} onPress={() => setASupprimer({ id: h.id, label: h.label })}>
+              <MaterialIcons name="delete-outline" size={19} color={colors.textFaint} />
+            </TouchableOpacity>
+          </View>
+        );
+      })}
+
+      {visibles.length === 0 && (
+        <Card style={{ alignItems: "center", paddingVertical: 34 }}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>🎯</Text>
+          <Text style={{ color: colors.textMuted, fontSize: 13, textAlign: "center" }}>
+            Aucune routine dans cette catégorie.
+          </Text>
+        </Card>
+      )}
+
+      <View style={{ height: 10 }} />
+      <BigButton
+        label={showForm ? "ANNULER" : "AJOUTER UNE ROUTINE"}
+        onPress={ouvrirCreation}
+        icone={<MaterialIcons name={showForm ? "close" : "add"} size={19} color="#101014" />}
+      />
+
+      {/* Sélecteur d'icône */}
       <Modal visible={pickerOpen} transparent animationType="slide">
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setPickerOpen(false)}>
-          <View style={styles.pickerModal}>
-            <Text style={styles.pickerTitle}>Choisis une icône</Text>
+        <TouchableOpacity style={styles.modalFond} activeOpacity={1} onPress={() => setPickerOpen(false)}>
+          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.modalCarte}>
+            <Text style={styles.modalTitre}>CHOISIS UNE ICÔNE</Text>
             <FlatList
               data={ICONS}
               numColumns={5}
               keyExtractor={i => i}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={styles.pickerCell}
+                  style={styles.cellule}
                   onPress={() => { setForm(f => ({ ...f, icon: item })); setPickerOpen(false); }}
                 >
-                  <Text style={{ fontSize: 28 }}>{item}</Text>
+                  <Text style={{ fontSize: 27 }}>{item}</Text>
                 </TouchableOpacity>
               )}
             />
-          </View>
+          </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
 
-      {categories.map(cat => (
-        <View key={cat} style={{ marginBottom: 16 }}>
-          <Text style={styles.catLabel}>{cat.toUpperCase()}</Text>
-          {habits.filter(h => h.category === cat).map(h => (
-            <View
-              key={h.id}
-              style={[styles.habitCard, {
-                borderColor: checked[h.id] ? h.color : colors.border2,
-                backgroundColor: checked[h.id] ? `${h.color}18` : colors.card,
-              }]}
-              {...(Platform.OS === "web" && !isTouchDevice
-                ? { onContextMenu: (e: any) => { e.preventDefault(); openEditForm(h); } }
-                : {})}
-            >
-              <TouchableOpacity
-                style={styles.habitLeft}
-                onPress={() => toggle(h.id)}
-                onLongPress={Platform.OS === "web" && !isTouchDevice ? undefined : () => openEditForm(h)}
-                delayLongPress={400}
-              >
-                <View style={[styles.habitIcon, { backgroundColor: `${h.color}20` }]}>
-                  <Text style={{ fontSize: 18 }}>{h.icon}</Text>
-                </View>
-                <Text style={styles.habitLabel}>{h.label}</Text>
-                <View style={[styles.checkbox, {
-                  backgroundColor: checked[h.id] ? h.color : "transparent",
-                  borderColor: checked[h.id] ? h.color : colors.border2,
-                }]}>
-                  {checked[h.id] && <Text style={{ color: "#000", fontSize: 12, fontWeight: "900" }}>✓</Text>}
-                </View>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => setDeleteTarget({ id: h.id, label: h.label })}>
-                <MaterialIcons name="delete-outline" size={20} color={colors.textMuted} />
-              </TouchableOpacity>
-            </View>
-          ))}
-        </View>
-      ))}
-
       <ConfirmDialog
-        visible={!!deleteTarget}
-        title="Supprimer cette habitude ?"
-        message={deleteTarget ? `"${deleteTarget.label}" et son historique de suivi seront définitivement supprimés.` : ""}
-        onCancel={() => setDeleteTarget(null)}
-        onConfirm={() => deleteTarget && deleteHabit(deleteTarget.id)}
+        visible={!!aSupprimer}
+        title="Supprimer cette routine ?"
+        message={aSupprimer ? `« ${aSupprimer.label} » et son historique de suivi seront définitivement supprimés.` : ""}
+        onCancel={() => setASupprimer(null)}
+        onConfirm={() => aSupprimer && supprimer(aSupprimer.id)}
       />
     </ScrollView>
   );

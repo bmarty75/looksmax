@@ -1,66 +1,38 @@
+import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
-import { Text } from "react-native";
 import { useTheme } from "../../contexts/ThemeContext";
 
-function TabIcon({ symbol, focused }: { symbol: string; focused: boolean }) {
-  const { colors } = useTheme();
-  return (
-    <Text style={{ fontSize: 20, color: focused ? "#C9A96E" : colors.textMuted }}>
-      {symbol}
-    </Text>
-  );
-}
+type NomIcone = React.ComponentProps<typeof MaterialIcons>["name"];
 
 export default function TabsLayout() {
   const { colors, mode } = useTheme();
+
+  const icone = (name: NomIcone) =>
+    ({ focused }: { focused: boolean }) => (
+      <MaterialIcons name={name} size={22} color={focused ? colors.amber : colors.textMuted} />
+    );
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: mode === "dark" ? "#0D0D0D" : colors.card,
+          backgroundColor: mode === "dark" ? "#08080A" : colors.card,
           borderTopColor: colors.border,
           borderTopWidth: 1,
-          height: 70,
-          paddingBottom: 12,
-          paddingTop: 8,
+          height: 76,
+          paddingBottom: 14,
+          paddingTop: 10,
         },
-        tabBarActiveTintColor: "#C9A96E",
+        tabBarActiveTintColor: colors.amber,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: {
-          fontSize: 9,
-          letterSpacing: 1,
-        },
+        tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
       }}
     >
-      <Tabs.Screen
-        name="index"
-        options={{
-          title: "Dashboard",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◈" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="habits"
-        options={{
-          title: "Habitudes",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◉" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="goals"
-        options={{
-          title: "Objectifs",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◎" focused={focused} />,
-        }}
-      />
-      <Tabs.Screen
-        name="photos"
-        options={{
-          title: "Photos",
-          tabBarIcon: ({ focused }) => <TabIcon symbol="◐" focused={focused} />,
-        }}
-      />
+      <Tabs.Screen name="index"  options={{ title: "Biométrie",   tabBarIcon: icone("monitor-heart") }} />
+      <Tabs.Screen name="habits" options={{ title: "Routines",    tabBarIcon: icone("checklist") }} />
+      <Tabs.Screen name="goals"  options={{ title: "Objectifs",   tabBarIcon: icone("track-changes") }} />
+      <Tabs.Screen name="photos" options={{ title: "Progression", tabBarIcon: icone("insights") }} />
     </Tabs>
   );
 }

@@ -1,311 +1,113 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
-import { useRouter } from "expo-router";
-import { useMemo, useCallback, useRef, useState } from "react";
-import { Animated, Easing, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
 import { useFocusEffect } from "@react-navigation/native";
+import { useCallback, useMemo, useState } from "react";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { RankSheet } from "../../components/RankSheet";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { AreaChart, Card, Pill, ProgressBar, Rings, SectionTitle, Sparkline } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { BADGES, DEFAULT_GOALS, DEFAULT_HABITS, RANKS, TIPS, getRank, todayKey } from "../../constants/data";
-import { loadProfile } from "../../lib/profile";
+import { DEFAULT_HABITS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import {
+  compute30DayAvg, computeCompositeScore, computeCurrentStreak, indexPsl,
+  partsParCategorie, projectionRangSuivant, serieCompletion, serieScore,
+} from "../../lib/metrics";
+import { loadProfile } from "../../lib/profile";
 
-// ─── Chart constants ──────────────────────────────────────────
-const CHART_W = 280;
-const CHART_H = 80;
-const CHART_PT = 8;
-const CHART_PB = 4;
+const JOURS = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
+const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
 
-// ─── Score hardcore : régularité > coup d'un jour ────────────
-// 20% jour même, 40% streak (max à 60 jours), 40% moyenne 30 jours
-const STREAK_MAX_DAYS = 60;
-const AVG_WINDOW_DAYS = 30;
-
-function computeCurrentStreak(history: Record<string, number>): number {
-  const d = new Date();
-  if ((history[d.toISOString().slice(0, 10)] || 0) <= 0) {
-    d.setDate(d.getDate() - 1); // grâce : le jour en cours n'est pas encore terminé
-  }
-  let streak = 0;
-  while ((history[d.toISOString().slice(0, 10)] || 0) > 0) {
-    streak++;
-    d.setDate(d.getDate() - 1);
-  }
-  return streak;
+/** Numéro de semaine ISO. */
+function numeroSemaine(d: Date): number {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  const debut = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  return Math.ceil(((t.getTime() - debut.getTime()) / 86400000 + 1) / 7);
 }
 
-function compute30DayAvg(history: Record<string, number>): number {
-  const d = new Date();
-  let sum = 0;
-  for (let i = 0; i < AVG_WINDOW_DAYS; i++) {
-    sum += history[d.toISOString().slice(0, 10)] || 0;
-    d.setDate(d.getDate() - 1);
-  }
-  return sum / AVG_WINDOW_DAYS;
-}
-
-function computeCompositeScore(todayPct: number, streak: number, avg30: number): number {
-  const streakComponent = Math.min(streak / STREAK_MAX_DAYS, 1) * 100;
-  const raw = 0.2 * todayPct + 0.4 * streakComponent + 0.4 * avg30;
-  return Math.max(0, Math.min(100, Math.round(raw)));
-}
-
-type Range = "week" | "month" | "year" | "all";
-const RANGES: { key: Range; label: string }[] = [
-  { key: "week",  label: "7J"   },
-  { key: "month", label: "1M"   },
-  { key: "year",  label: "1A"   },
-  { key: "all",   label: "Tout" },
-];
-
-// ─── Momentum : EMA avec décroissance asymétrique ────────────
-function computeMomentum(history: Record<string, number>): Record<string, number> {
-  const allKeys = Object.keys(history).sort();
-  if (allKeys.length === 0) return {};
-
-  let m = 0;
-  const result: Record<string, number> = {};
-  const cur = new Date(allKeys[0]);
-  const end = new Date();
-
-  while (cur <= end) {
-    const key = cur.toISOString().slice(0, 10);
-    const score = history[key] ?? 0;
-    if (score > 0) {
-      m = m + 0.08 * (score - m);
-    } else {
-      m = m * (1 - 0.05 * Math.exp(-m / 35));
-    }
-    result[key] = Math.round(m * 10) / 10;
-    cur.setDate(cur.getDate() + 1);
-  }
-  return result;
-}
-
-// ─── Données chart selon la plage ────────────────────────────
-interface ChartPoint { score: number; label: string }
-const MN = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
-const DN = ["D","L","M","M","J","V","S"];
-
-function getChartData(mHist: Record<string, number>, range: Range): ChartPoint[] {
-  const today = new Date();
-
-  if (range === "week") {
-    return Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() - (6 - i));
-      return { score: mHist[d.toISOString().slice(0, 10)] || 0, label: i === 6 ? "Auj" : DN[d.getDay()] };
-    });
-  }
-  if (range === "month") {
-    return Array.from({ length: 30 }, (_, i) => {
-      const d = new Date(today);
-      d.setDate(today.getDate() - (29 - i));
-      return { score: mHist[d.toISOString().slice(0, 10)] || 0, label: i % 7 === 0 ? `${d.getDate()}` : "" };
-    });
-  }
-  if (range === "year") {
-    return Array.from({ length: 52 }, (_, w) => {
-      const we = new Date(today);
-      we.setDate(today.getDate() - (51 - w) * 7);
-      let sum = 0, cnt = 0;
-      for (let d = 6; d >= 0; d--) {
-        const dd = new Date(we);
-        dd.setDate(we.getDate() - d);
-        const v = mHist[dd.toISOString().slice(0, 10)];
-        if (v != null) { sum += v; cnt++; }
-      }
-      return { score: cnt > 0 ? Math.round(sum / cnt) : 0, label: w % 8 === 0 ? MN[we.getMonth()] : "" };
-    });
-  }
-  // All time — moyennes mensuelles
-  const allKeys = Object.keys(mHist).sort();
-  if (allKeys.length === 0) return [{ score: 0, label: "" }];
-  const months: ChartPoint[] = [];
-  const first = new Date(allKeys[0]);
-  const cur = new Date(first.getFullYear(), first.getMonth(), 1);
-  const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-  while (cur <= endDate) {
-    const y = cur.getFullYear(), mo = cur.getMonth();
-    let sum = 0, cnt = 0;
-    allKeys.forEach(k => {
-      const d = new Date(k);
-      if (d.getFullYear() === y && d.getMonth() === mo) { sum += mHist[k]; cnt++; }
-    });
-    months.push({ score: cnt > 0 ? Math.round(sum / cnt) : 0, label: MN[mo] });
-    cur.setMonth(cur.getMonth() + 1);
-  }
-  return months.length > 0 ? months : [{ score: 0, label: "" }];
-}
-
-// ─── SVG path helpers ─────────────────────────────────────────
-function smoothPath(pts: { x: number; y: number }[]): string {
-  if (pts.length < 2) return "";
-  let d = `M ${pts[0].x} ${pts[0].y}`;
-  for (let i = 1; i < pts.length; i++) {
-    const p = pts[i - 1], c = pts[i];
-    const cx = (p.x + c.x) / 2;
-    d += ` C ${cx} ${p.y}, ${cx} ${c.y}, ${c.x} ${c.y}`;
-  }
-  return d;
-}
-
-function buildChart(data: ChartPoint[]) {
-  const n = data.length;
-  const yRange = CHART_H - CHART_PT - CHART_PB;
-  const pts = data.map((d, i) => ({
-    x: n > 1 ? (i / (n - 1)) * CHART_W : CHART_W / 2,
-    y: CHART_H - CHART_PB - (d.score / 100) * yRange,
-  }));
-  const line = smoothPath(pts);
-  const fill = line ? `${line} L ${pts[pts.length - 1].x} ${CHART_H} L ${pts[0].x} ${CHART_H} Z` : "";
-  return { pts, line, fill };
-}
-
-// ─── Styles ───────────────────────────────────────────────────
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    root:          { flex: 1, backgroundColor: c.bg, paddingHorizontal: 16 },
-    header:        { paddingTop: 60, paddingBottom: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "flex-end", borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16 },
-    headerSub:     { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
-    headerTitle:   { fontSize: 24, fontWeight: "800", color: c.text },
-    headerRight:   { flexDirection: "row", gap: 10, alignItems: "center" },
-    themeBtn:      { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    rankBadge:     { minWidth: 48, height: 32, paddingHorizontal: 10, borderRadius: 16, borderWidth: 2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    rankLabel:     { fontSize: 12, fontWeight: "800" },
-    card:          { backgroundColor: c.card, borderWidth: 1, borderColor: c.border, borderRadius: 16, padding: 20 },
-    cardTitle:     { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700" },
-    chartHeader:   { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
-    rangeRow:      { flexDirection: "row", gap: 5 },
-    rangeBtn:      { paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, borderWidth: 1, borderColor: c.border2 },
-    rangeBtnActive:{ borderColor: "#C9A96E55", backgroundColor: "#C9A96E11" },
-    rangeTxt:      { fontSize: 9, fontWeight: "700", color: c.textFaint, letterSpacing: 0.5 },
-    rangeTxtActive:{ color: "#C9A96E" },
-    ringWrap:      { alignItems: "center", justifyContent: "center", marginBottom: 20, height: 150 },
-    ringCenter:    { position: "absolute", alignItems: "center" },
-    ringScore:     { fontSize: 36, fontWeight: "800", lineHeight: 40 },
-    ringSubLabel:  { fontSize: 9, letterSpacing: 3, color: c.textMuted, fontWeight: "700", marginTop: 2 },
-    // Fix overflow : letterSpacing 0, maxWidth, textAlign center
-    rankTitle:     { fontSize: 8, fontWeight: "700", letterSpacing: 0, marginTop: 4, maxWidth: 90, textAlign: "center" },
-    statsRow:      { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
-    stat:          { alignItems: "center" },
-    statNum:       { fontSize: 20, fontWeight: "800" },
-    statLabel:     { fontSize: 10, color: c.textFaint, marginTop: 4 },
-    statDivider:   { width: 1, height: 32, backgroundColor: c.border },
-    weakRow:       { flexDirection: "row", justifyContent: "space-between", marginBottom: 5 },
-    weakLabel:     { color: c.textSub, fontSize: 13 },
-    weakPct:       { fontSize: 12, fontWeight: "700" },
-    barTrack:      { height: 4, backgroundColor: c.surface, borderRadius: 2, overflow: "hidden" },
-    barFill:       { height: "100%", borderRadius: 2 },
-    badgeGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-    badgeItem:     { width: "22%", alignItems: "center", gap: 5 },
-    badgeIcon:     { width: 44, height: 44, borderRadius: 12, backgroundColor: c.surface, alignItems: "center", justifyContent: "center", borderWidth: 1 },
-    badgeName:     { fontSize: 8, color: c.textSub, textAlign: "center", fontWeight: "700" },
-    tipCard:       { marginTop: 12, backgroundColor: c.card, borderWidth: 1, borderColor: "#C9A96E22", borderLeftWidth: 3, borderLeftColor: "#C9A96E", borderRadius: 12, padding: 14, flexDirection: "row", gap: 12, overflow: "hidden" },
-    tipText:       { fontSize: 13, color: c.textSub, lineHeight: 20, flex: 1 },
-    rankModalOverlay: { flex: 1, backgroundColor: "#000a", justifyContent: "flex-end" },
-    rankModalCard:    { backgroundColor: c.card, borderTopLeftRadius: 20, borderTopRightRadius: 20, padding: 20, paddingBottom: 34, maxHeight: "80%" },
-    rankModalTitle:   { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700", textAlign: "center", marginBottom: 16 },
-    rankRow:          { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: c.border, borderRadius: 14, padding: 14, marginBottom: 10 },
-    rankRowActive:    { backgroundColor: "#C9A96E11" },
-    rankDot:          { width: 14, height: 14, borderRadius: 7, marginRight: 14 },
-    rankRowLabel:     { fontSize: 15, fontWeight: "800" },
-    rankRowTitle:     { fontSize: 11, marginTop: 1 },
-    rankRowRange:     { fontSize: 13, fontWeight: "800" },
-    rankRowPop:       { fontSize: 9, fontWeight: "700", marginTop: 2 },
-    rankRowStreak:    { fontSize: 9, fontWeight: "700", marginTop: 3, letterSpacing: 0.5 },
-    rankYouTag:       { fontSize: 8, fontWeight: "800", letterSpacing: 1, backgroundColor: "#C9A96E", color: "#000", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8, overflow: "hidden" },
-    rankModalClose:   { marginTop: 6, alignItems: "center", padding: 12 },
-    rankModalCloseText: { fontSize: 13, fontWeight: "700" },
-    avatarBtn:        { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card, overflow: "hidden" },
-    avatarBtnImg:     { width: "100%", height: "100%" },
+    root:        { flex: 1, backgroundColor: c.bg },
+    content:     { paddingHorizontal: 16, paddingBottom: 30 },
+
+    dateRow:     { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 },
+    dateGauche:  { flexDirection: "row", alignItems: "center", gap: 8, flex: 1, paddingRight: 10 },
+    dateTxt:     { fontSize: 15, fontWeight: "800", color: c.text, letterSpacing: 0.3 },
+
+    semaine:     { flexDirection: "row", gap: 6, marginBottom: 18 },
+    jour:        { flex: 1, alignItems: "center", paddingVertical: 9, borderRadius: 13, backgroundColor: c.card },
+    jourNom:     { fontSize: 9, fontWeight: "700", color: c.textMuted, letterSpacing: 0.5 },
+    jourNum:     { fontSize: 15, fontWeight: "800", color: c.text, marginTop: 3 },
+    jourPoint:   { width: 4, height: 4, borderRadius: 2, marginTop: 3 },
+
+    ringCard:    { alignItems: "center", paddingVertical: 24 },
+    pslValeur:   { fontSize: 42, fontWeight: "800", color: c.text, lineHeight: 46 },
+    pslLabel:    { fontSize: 9, fontWeight: "700", color: c.textMuted, letterSpacing: 2.5, marginTop: 2 },
+    legende:     { flexDirection: "row", justifyContent: "space-around", width: "100%", marginTop: 22, paddingTop: 18, borderTopWidth: 1, borderTopColor: c.border },
+    legItem:     { alignItems: "center", gap: 5 },
+    legHaut:     { flexDirection: "row", alignItems: "center", gap: 5 },
+    legPoint:    { width: 7, height: 7, borderRadius: 4 },
+    legNom:      { fontSize: 9, fontWeight: "700", color: c.textMuted, letterSpacing: 0.8 },
+    legVal:      { fontSize: 17, fontWeight: "800", color: c.text },
+
+    mesures:     { flexDirection: "row", gap: 10, marginBottom: 22 },
+    mesure:      { flex: 1, backgroundColor: c.card, borderRadius: 16, padding: 13 },
+    mesureNom:   { fontSize: 8.5, fontWeight: "700", color: c.textMuted, letterSpacing: 0.8 },
+    mesureVal:   { fontSize: 19, fontWeight: "800", color: c.text, marginTop: 6 },
+    mesureNote:  { fontSize: 9.5, fontWeight: "700", marginTop: 2, marginBottom: 6 },
+
+    protoTitre:  { fontSize: 17, fontWeight: "800", color: c.text, lineHeight: 22 },
+    protoSous:   { fontSize: 9, fontWeight: "700", color: c.textMuted, letterSpacing: 1.4, marginTop: 3 },
+    ligne:       { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11 },
+    ligneIcone:  { width: 38, height: 38, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+    ligneNom:    { fontSize: 13.5, fontWeight: "700", color: c.text },
+    ligneSous:   { fontSize: 11, color: c.textMuted, marginTop: 2 },
+    coche:       { width: 28, height: 28, borderRadius: 14, borderWidth: 1.5, alignItems: "center", justifyContent: "center" },
+
+    trajTitre:   { fontSize: 20, fontWeight: "800", color: c.text },
+    trajLabels:  { flexDirection: "row", justifyContent: "space-between", marginTop: 6 },
+    trajLabel:   { fontSize: 9, color: c.textFaint, fontWeight: "700" },
+    encart:      { backgroundColor: c.surface, borderRadius: 14, padding: 14, flexDirection: "row", alignItems: "center", gap: 12, marginTop: 14 },
+    encartNom:   { fontSize: 13, fontWeight: "800", color: c.text },
+    encartSous:  { fontSize: 11, color: c.textMuted, marginTop: 2 },
   });
 }
 
-const DEFAULT_STATS = {
-  streak: 0, totalChecked: 0, perfectDays: 0,
-  waterCount: 0, goalsCreated: 0, avgScore: 0, photos: 0,
-};
-
-// ─── Dashboard ────────────────────────────────────────────────
-export default function Dashboard() {
-  const { colors, mode, toggle } = useTheme();
+export default function Biometrie() {
+  const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const [loaded, setLoaded]               = useState(false);
-  const [score, setScore]                 = useState(0);
-  const [stats, setStats]                 = useState(DEFAULT_STATS);
-  const [goals, setGoals]                 = useState<any[]>([]);
-  const [history, setHistory]             = useState<Record<string, number>>({});
-  const [habits, setHabits]               = useState<any[]>([]);
-  const [habitsLen, setHabitsLen]         = useState(0);
-  const [completedToday, setCompletedToday] = useState(0);
-  const [habitCounts, setHabitCounts]     = useState<Record<string, number>>({});
-  const [streak, setStreak]               = useState(0);
-  const [range, setRange]                 = useState<Range>("week");
-  const [rankModalOpen, setRankModalOpen] = useState(false);
-  const [avatar, setAvatar] = useState<string | null>(null);
-  const router = useRouter();
-  const [tip, setTip]                     = useState(() => TIPS[Math.floor(Math.random() * TIPS.length)]);
-  const tipOpacity = useRef(new Animated.Value(1)).current;
-  const tipSlide   = useRef(new Animated.Value(0)).current;
-  const rankListRef    = useRef<ScrollView>(null);
-  const rankRowOffsets = useRef<Record<string, number>>({});
-
-  const swooshToNewTip = useCallback(() => {
-    Animated.parallel([
-      Animated.timing(tipOpacity, { toValue: 0, duration: 150, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-      Animated.timing(tipSlide,   { toValue: -24, duration: 150, easing: Easing.in(Easing.cubic), useNativeDriver: true }),
-    ]).start(() => {
-      setTip(TIPS[Math.floor(Math.random() * TIPS.length)]);
-      tipSlide.setValue(24);
-      Animated.parallel([
-        Animated.timing(tipOpacity, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(tipSlide,   { toValue: 0, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]).start();
-    });
-  }, []);
+  const [pret, setPret]         = useState(false);
+  const [habits, setHabits]     = useState<any[]>([]);
+  const [checked, setChecked]   = useState<Record<string, boolean>>({});
+  const [history, setHistory]   = useState<Record<string, number>>({});
+  const [counts7j, setCounts7j] = useState<Record<string, number>>({});
+  const [avatar, setAvatar]     = useState<string | null>(null);
+  const [echelleOuverte, setEchelleOuverte] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      swooshToNewTip();
-      const tipInterval = setInterval(swooshToNewTip, 15000);
-      return () => clearInterval(tipInterval);
-    }, [swooshToNewTip])
-  );
-
-  useFocusEffect(
-    useCallback(() => {
-      const load = async () => {
+      (async () => {
         try {
-          const habitsData = await storage.get("lm_habits", DEFAULT_HABITS);
-          const checked    = await storage.get(`lm_checked_${todayKey()}`, {});
-          const g          = await storage.get("lm_goals", DEFAULT_GOALS);
-          const h          = await storage.get("lm_history", {});
-          const s          = await storage.get("lm_stats", DEFAULT_STATS);
+          const h  = await storage.get("lm_habits", DEFAULT_HABITS);
+          const ch = await storage.get(`lm_checked_${todayKey()}`, {});
+          const hi = await storage.get("lm_history", {});
 
-          const habitsArr  = Array.isArray(habitsData) ? habitsData : DEFAULT_HABITS;
-          const checkedObj = checked && typeof checked === "object" ? checked : {};
-          const goalsArr   = Array.isArray(g) ? g : DEFAULT_GOALS;
-          const historyObj = h && typeof h === "object" ? h : {};
-          const statsObj   = s && typeof s === "object" ? { ...DEFAULT_STATS, ...s } : DEFAULT_STATS;
+          const habitsArr  = Array.isArray(h) ? h : DEFAULT_HABITS;
+          const checkedObj = ch && typeof ch === "object" ? ch : {};
+          const historyObj = hi && typeof hi === "object" ? hi : {};
 
-          const completed = Object.values(checkedObj).filter(Boolean).length;
-          const todayPct  = habitsArr.length > 0 ? Math.round((completed / habitsArr.length) * 100) : 0;
-
-          if (historyObj[todayKey()] !== todayPct) {
-            historyObj[todayKey()] = todayPct;
+          const faits = Object.values(checkedObj).filter(Boolean).length;
+          const pct = habitsArr.length > 0 ? Math.round((faits / habitsArr.length) * 100) : 0;
+          if (historyObj[todayKey()] !== pct) {
+            historyObj[todayKey()] = pct;
             await storage.set("lm_history", historyObj);
           }
 
-          const currentStreak = computeCurrentStreak(historyObj);
-          const avg30 = compute30DayAvg(historyObj);
-          const sc = computeCompositeScore(todayPct, currentStreak, avg30);
-
           const counts: Record<string, number> = {};
-          const today = new Date();
           for (let i = 0; i < 7; i++) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
+            const d = new Date();
+            d.setDate(d.getDate() - i);
             const dc = await storage.get(`lm_checked_${d.toISOString().slice(0, 10)}`, {});
             if (dc && typeof dc === "object") {
               Object.entries(dc as Record<string, boolean>).forEach(([id, v]) => {
@@ -315,285 +117,229 @@ export default function Dashboard() {
           }
 
           setHabits(habitsArr);
-          setHabitsLen(habitsArr.length);
-          setCompletedToday(completed);
-          setScore(sc);
-          setStreak(currentStreak);
-          setGoals(goalsArr);
+          setChecked(checkedObj);
           setHistory(historyObj);
-          setStats(statsObj);
-          setHabitCounts(counts);
+          setCounts7j(counts);
           setAvatar((await loadProfile()).avatar);
-        } catch (e) {
-          console.error(e);
         } finally {
-          setLoaded(true);
+          setPret(true);
         }
-      };
-      load();
-    }, [])
+      })();
+    }, []),
   );
 
-  if (!loaded) {
+  if (!pret) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ color: "#C9A96E", fontSize: 32 }}>◈</Text>
+      <View style={[styles.root, { alignItems: "center", justifyContent: "center" }]}>
+        <Text style={{ color: colors.amber, fontSize: 30 }}>◈</Text>
       </View>
     );
   }
 
-  const rank = getRank(score, streak);
-  const circ = 2 * Math.PI * 54;
-  const offset = circ - (score / 100) * circ;
+  const aujourdhui  = new Date();
+  const faits       = Object.values(checked).filter(Boolean).length;
+  const pctJour     = habits.length > 0 ? Math.round((faits / habits.length) * 100) : 0;
+  const streak      = computeCurrentStreak(history);
+  const moyenne30   = compute30DayAvg(history);
+  const score       = computeCompositeScore(pctJour, streak, moyenne30);
+  const rang        = getRank(score, streak);
+  const psl         = indexPsl(score, streak);
+  const parts       = partsParCategorie(habits, counts7j, [colors.amber, colors.green, colors.coral]);
+  const projection  = projectionRangSuivant(history);
+  const restantes   = habits.filter(h => !checked[h.id]);
+  const serie7      = serieScore(history, 7);
+  const progression = serie7.length >= 2 ? serie7[serie7.length - 1] - serie7[0] : 0;
+  const joursActifs = Object.values(history).filter(v => v > 0).length;
 
-  const totalChecked = Object.values(history).filter(v => v > 0).length;
-  const perfectDays   = Object.values(history).filter(v => v === 100).length;
-  const unlockedBadges = BADGES.filter(b => b.condition({ ...stats, streak, totalChecked, perfectDays, rank: rank.label }));
-
-  const weakHabits = habits
-    .map(h => ({ ...h, rate: Math.round(((habitCounts[h.id] || 0) / 7) * 100) }))
-    .filter(h => h.rate < 100)
-    .sort((a, b) => a.rate - b.rate)
-    .slice(0, 3);
-
-  const momentumHist = computeMomentum(history);
-  const chartData    = getChartData(momentumHist, range);
-  const { pts, line, fill } = buildChart(chartData);
-  const n = chartData.length;
+  // Bandeau de la semaine, du lundi au dimanche.
+  const lundi = new Date(aujourdhui);
+  lundi.setDate(aujourdhui.getDate() - ((aujourdhui.getDay() + 6) % 7));
+  const semaine = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(lundi);
+    d.setDate(lundi.getDate() + i);
+    const k = d.toISOString().slice(0, 10);
+    return { date: d, cle: k, actif: (history[k] || 0) > 0, cejour: k === todayKey() };
+  });
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <ScreenHeader section="Biométrie" avatar={avatar} rang={rang} />
 
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerSub}>LOOKSMAX OS</Text>
-          <Text style={styles.headerTitle}>Dashboard</Text>
+      <View style={styles.dateRow}>
+        <View style={styles.dateGauche}>
+          <MaterialIcons name="calendar-today" size={15} color={colors.amber} />
+          <Text style={styles.dateTxt}>
+            AUJOURD&apos;HUI, {aujourdhui.getDate()} {MOIS[aujourdhui.getMonth()].toUpperCase()}
+          </Text>
         </View>
-        <View style={styles.headerRight}>
-          <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push("/profile")}>
-            {avatar
-              ? <Image source={{ uri: avatar }} style={styles.avatarBtnImg} />
-              : <MaterialIcons name="person-outline" size={18} color={colors.textSub} />}
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.themeBtn} onPress={toggle}>
-            <Text style={{ fontSize: 15 }}>{mode === "dark" ? "☀️" : "🌙"}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.rankBadge, { borderColor: rank.color }]} onPress={() => setRankModalOpen(true)}>
-            <Text style={[styles.rankLabel, { color: rank.color }]}>{rank.label}</Text>
-          </TouchableOpacity>
+        <Pill>SEMAINE {numeroSemaine(aujourdhui)}</Pill>
+      </View>
+
+      <View style={styles.semaine}>
+        {semaine.map(j => (
+          <View key={j.cle} style={[styles.jour, j.cejour && { backgroundColor: colors.amber }]}>
+            <Text style={[styles.jourNom, j.cejour && { color: colors.onAmber }]}>{JOURS[j.date.getDay()]}</Text>
+            <Text style={[styles.jourNum, j.cejour && { color: colors.onAmber }]}>{j.date.getDate()}</Text>
+            <View style={[
+              styles.jourPoint,
+              { backgroundColor: j.actif ? (j.cejour ? colors.onAmber : colors.green) : "transparent" },
+            ]} />
+          </View>
+        ))}
+      </View>
+
+      {/* Anneaux : un par catégorie d'habitude, sur 7 jours */}
+      <Card style={styles.ringCard}>
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => setEchelleOuverte(true)}
+          accessibilityLabel="Voir l'échelle des rangs"
+        >
+          <Rings
+            valeurs={parts.map(p => ({ valeur: p.taux, couleur: p.couleur }))}
+            enfant={
+              <>
+                <Text style={styles.pslValeur}>{psl.toFixed(1)}</Text>
+                <Text style={styles.pslLabel}>PSL INDEX</Text>
+                <Pill color={rang.color} teinte={`${rang.color}22`} dot style={{ marginTop: 8 }}>
+                  {rang.label.toUpperCase()}
+                </Pill>
+              </>
+            }
+          />
+        </TouchableOpacity>
+        <View style={styles.legende}>
+          {parts.map(p => (
+            <View key={p.categorie} style={styles.legItem}>
+              <View style={styles.legHaut}>
+                <View style={[styles.legPoint, { backgroundColor: p.couleur }]} />
+                <Text style={styles.legNom}>{p.libelle}</Text>
+              </View>
+              <Text style={styles.legVal}>{p.taux}%</Text>
+            </View>
+          ))}
+        </View>
+      </Card>
+
+      <View style={{ height: 22 }} />
+
+      <SectionTitle right={<Text style={{ color: colors.green, fontSize: 10, fontWeight: "700" }}>7 DERNIERS JOURS</Text>}>
+        ÉTAT DE LA RÉGULARITÉ
+      </SectionTitle>
+
+      <View style={styles.mesures}>
+        <View style={styles.mesure}>
+          <Text style={styles.mesureNom}>STREAK</Text>
+          <Text style={styles.mesureVal}>{streak} j</Text>
+          <Text style={[styles.mesureNote, { color: streak > 0 ? colors.green : colors.textMuted }]}>
+            {streak > 0 ? "en cours" : "à relancer"}
+          </Text>
+          <Sparkline valeurs={serieCompletion(history, 14)} couleur={colors.green} />
+        </View>
+        <View style={styles.mesure}>
+          <Text style={styles.mesureNom}>MOYENNE 30 J</Text>
+          <Text style={styles.mesureVal}>{Math.round(moyenne30)}%</Text>
+          <Text style={[styles.mesureNote, { color: colors.amber }]}>Obj. 100%</Text>
+          <Sparkline valeurs={serieScore(history, 14)} couleur={colors.amber} />
+        </View>
+        <View style={styles.mesure}>
+          <Text style={styles.mesureNom}>JOURS ACTIFS</Text>
+          <Text style={styles.mesureVal}>{joursActifs}</Text>
+          <Text style={[styles.mesureNote, { color: colors.coral }]}>depuis le début</Text>
+          <Sparkline valeurs={serieCompletion(history, 14)} couleur={colors.coral} />
         </View>
       </View>
 
-      {/* Score ring */}
-      <View style={styles.card}>
-        <View style={styles.ringWrap}>
-          <Svg width={140} height={140} style={{ transform: [{ rotate: "-90deg" }] }}>
-            <Defs>
-              <LinearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-                <Stop offset="0%" stopColor={rank.color} />
-                <Stop offset="100%" stopColor="#F0D090" />
-              </LinearGradient>
-            </Defs>
-            <Circle cx={70} cy={70} r={54} fill="none" stroke={colors.border} strokeWidth={10} />
-            <Circle cx={70} cy={70} r={54} fill="none" stroke="url(#ringGrad)" strokeWidth={10}
-              strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" />
-          </Svg>
-          <View style={styles.ringCenter}>
-            <Text style={[styles.ringScore, { color: rank.color }]}>{score}</Text>
-            <Text style={styles.ringSubLabel}>SCORE</Text>
-            <Text style={[styles.rankTitle, { color: rank.color }]}>PSL {rank.psl}</Text>
+      {/* Ce qu'il reste à faire aujourd'hui */}
+      <Card>
+        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={styles.protoTitre}>Protocole du jour</Text>
+            <Text style={styles.protoSous}>ROUTINES NON COMPLÉTÉES</Text>
           </View>
+          <Pill color={restantes.length === 0 ? colors.green : colors.amber} teinte={colors.surface}>
+            {restantes.length === 0 ? "TERMINÉ" : `${restantes.length} RESTANTES`}
+          </Pill>
         </View>
-        <View style={styles.statsRow}>
-          <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#E07B5A" }]}>{streak}🔥</Text>
-            <Text style={styles.statLabel}>Streak</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#C9A96E" }]}>{completedToday}/{habitsLen}</Text>
-            <Text style={styles.statLabel}>Aujourd'hui</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <TouchableOpacity style={styles.stat} onPress={() => setRankModalOpen(true)}>
-            <Text style={[styles.statNum, { color: rank.color, fontSize: rank.label.length > 4 ? 15 : 20 }]}>{rank.label}</Text>
-            <Text style={styles.statLabel}>Rang</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
 
-      {/* Courbe de progression */}
-      <View style={[styles.card, { marginTop: 12 }]}>
-        <View style={styles.chartHeader}>
-          <Text style={styles.cardTitle}>PROGRESSION</Text>
-          <View style={styles.rangeRow}>
-            {RANGES.map(r => (
-              <TouchableOpacity
-                key={r.key}
-                onPress={() => setRange(r.key)}
-                style={[styles.rangeBtn, range === r.key && styles.rangeBtnActive]}
-              >
-                <Text style={[styles.rangeTxt, range === r.key && styles.rangeTxtActive]}>
-                  {r.label}
-                </Text>
-              </TouchableOpacity>
+        <View style={{ marginTop: 10 }}>
+          {restantes.slice(0, 3).map(h => (
+            <View key={h.id} style={styles.ligne}>
+              <View style={[styles.ligneIcone, { backgroundColor: `${h.color}1F` }]}>
+                <Text style={{ fontSize: 17 }}>{h.icon}</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.ligneNom}>{h.label}</Text>
+                <Text style={styles.ligneSous}>{(h.category ?? "").toUpperCase()}</Text>
+              </View>
+              <View style={[styles.coche, { borderColor: colors.border2 }]} />
+            </View>
+          ))}
+          {restantes.length === 0 && (
+            <View style={styles.ligne}>
+              <View style={[styles.ligneIcone, { backgroundColor: `${colors.green}1F` }]}>
+                <MaterialIcons name="check" size={19} color={colors.green} />
+              </View>
+              <Text style={[styles.ligneNom, { flex: 1 }]}>Journée complète</Text>
+            </View>
+          )}
+        </View>
+
+        <View style={{ marginTop: 10 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 7 }}>
+            <Text style={[styles.mesureNom, { color: colors.textSub }]}>PROGRESSION DU JOUR</Text>
+            <Text style={[styles.mesureNom, { color: colors.text }]}>{faits}/{habits.length}</Text>
+          </View>
+          <ProgressBar value={pctJour} color={colors.amber} />
+        </View>
+      </Card>
+
+      <View style={{ height: 22 }} />
+
+      {/* Trajectoire */}
+      <Card>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <Text style={[styles.mesureNom, { color: colors.textSub }]}>TRAJECTOIRE 7 JOURS</Text>
+          <Pill color={progression >= 0 ? colors.green : colors.coral} teinte={colors.surface}>
+            {progression >= 0 ? "+" : ""}{progression} PTS
+          </Pill>
+        </View>
+        <Text style={styles.trajTitre}>Score {score}/100</Text>
+
+        <View style={{ marginTop: 12 }}>
+          <AreaChart valeurs={serie7} couleur={colors.amber} id="traj" />
+          <View style={styles.trajLabels}>
+            {["S-6", "S-5", "S-4", "S-3", "S-2", "Hier", "Auj."].map(l => (
+              <Text key={l} style={styles.trajLabel}>{l}</Text>
             ))}
           </View>
         </View>
 
-        <Svg width="100%" height={CHART_H} viewBox={`0 0 ${CHART_W} ${CHART_H}`}>
-          <Defs>
-            <LinearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor={rank.color} stopOpacity={0.22} />
-              <Stop offset="100%" stopColor={rank.color} stopOpacity={0} />
-            </LinearGradient>
-          </Defs>
-          {[25, 50, 75].map(v => {
-            const gy = CHART_H - CHART_PB - (v / 100) * (CHART_H - CHART_PT - CHART_PB);
-            return <Line key={v} x1={0} y1={gy} x2={CHART_W} y2={gy} stroke={colors.border} strokeWidth={1} />;
-          })}
-          {pts.length === 1 ? (
-            <Circle cx={pts[0].x} cy={pts[0].y} r={4} fill={rank.color} />
-          ) : (
-            <>
-              <Path d={fill} fill="url(#chartFill)" />
-              <Path d={line} fill="none" stroke={rank.color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-            </>
+        <View style={styles.encart}>
+          <MaterialIcons name="military-tech" size={22} color={colors.amber} />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.encartNom}>
+              {projection.rang ? `Prochain rang : ${projection.rang.label}` : "Rang maximal atteint"}
+            </Text>
+            <Text style={styles.encartSous}>
+              {projection.rang == null
+                ? "Tu es au sommet de l'échelle."
+                : projection.jours != null
+                  ? `Dans ${projection.jours} jours à ton rythme actuel`
+                  : "Augmente ta régularité pour l'atteindre"}
+            </Text>
+          </View>
+          {projection.rang && (
+            <Pill teinte={colors.card} color={colors.textSub}>{projection.scoreRequis} REQUIS</Pill>
           )}
-          {pts.length > 0 && (
-            <Circle cx={pts[pts.length - 1].x} cy={pts[pts.length - 1].y} r={3.5} fill={rank.color} />
-          )}
-        </Svg>
-
-        <View style={{ height: 18, marginTop: 4, position: "relative" }}>
-          {chartData.map((pt, i) => {
-            if (!pt.label) return null;
-            const pct = n > 1 ? (i / (n - 1)) * 100 : 50;
-            return (
-              <View key={i} style={{ position: "absolute", left: `${pct}%` as any, width: 26, marginLeft: -13 }}>
-                <Text style={{ fontSize: 8, color: colors.textMuted, fontWeight: "700", textAlign: "center" }}>
-                  {pt.label}
-                </Text>
-              </View>
-            );
-          })}
         </View>
-      </View>
+      </Card>
 
-      {/* Points faibles */}
-      {weakHabits.length > 0 && (
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={[styles.cardTitle, { marginBottom: 14 }]}>POINTS FAIBLES — 7 JOURS</Text>
-          {weakHabits.map(h => {
-            const barColor = h.rate < 30 ? "#E07B5A" : h.rate < 65 ? "#E0C55A" : "#7ECC8A";
-            return (
-              <View key={h.id} style={{ marginBottom: 10 }}>
-                <View style={styles.weakRow}>
-                  <Text style={styles.weakLabel}>{h.icon} {h.label}</Text>
-                  <Text style={[styles.weakPct, { color: barColor }]}>{h.rate}%</Text>
-                </View>
-                <View style={styles.barTrack}>
-                  <View style={[styles.barFill, { width: `${Math.max(h.rate, 2)}%` as any, backgroundColor: barColor }]} />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Badges */}
-      <View style={[styles.card, { marginTop: 12 }]}>
-        <Text style={[styles.cardTitle, { marginBottom: 16 }]}>BADGES ({unlockedBadges.length}/{BADGES.length})</Text>
-        <View style={styles.badgeGrid}>
-          {BADGES.map(b => {
-            const unlocked = unlockedBadges.find(u => u.id === b.id);
-            return (
-              <View key={b.id} style={[styles.badgeItem, { opacity: unlocked ? 1 : 0.2 }]}>
-                <View style={[styles.badgeIcon, { borderColor: unlocked ? "#C9A96E55" : colors.border }]}>
-                  <Text style={{ fontSize: 20 }}>{b.icon}</Text>
-                </View>
-                <Text style={styles.badgeName}>{b.label}</Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-
-      {/* Objectifs */}
-      {goals.length > 0 && (
-        <View style={[styles.card, { marginTop: 12 }]}>
-          <Text style={[styles.cardTitle, { marginBottom: 16 }]}>OBJECTIFS EN COURS</Text>
-          {goals.slice(0, 3).map(g => {
-            const pct = g.target > 0 ? Math.min(Math.round((g.progress / g.target) * 100), 100) : 0;
-            return (
-              <View key={g.id} style={{ marginBottom: 12 }}>
-                <Text style={{ color: colors.textSub, fontSize: 12, marginBottom: 6 }}>{g.icon} {g.label}</Text>
-                <View style={styles.barTrack}>
-                  <View style={[styles.barFill, { width: `${pct}%` as any, backgroundColor: g.color }]} />
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {/* Tip */}
-      <View style={styles.tipCard}>
-        <Text style={{ fontSize: 18 }}>💡</Text>
-        <Animated.View style={{ flex: 1, opacity: tipOpacity, transform: [{ translateX: tipSlide }] }}>
-          <Text style={styles.tipText}>{tip}</Text>
-        </Animated.View>
-      </View>
-
-      <Modal visible={rankModalOpen} transparent animationType="slide" onRequestClose={() => setRankModalOpen(false)}>
-        <TouchableOpacity style={styles.rankModalOverlay} activeOpacity={1} onPress={() => setRankModalOpen(false)}>
-          <TouchableOpacity activeOpacity={1} onPress={() => {}} style={styles.rankModalCard}>
-            <Text style={styles.rankModalTitle}>ÉCHELLE PSL</Text>
-            <ScrollView
-              ref={rankListRef}
-              onContentSizeChange={() => {
-                // amène le rang courant dans le champ de vision à l'ouverture
-                const y = rankRowOffsets.current[rank.label];
-                if (y != null) rankListRef.current?.scrollTo({ y: Math.max(0, y - 70), animated: false });
-              }}
-            >
-              {RANKS.map(r => {
-                const isCurrent = r.label === rank.label;
-                const maxDisplay = r.max > 100 ? 100 : r.max - 1;
-                return (
-                  <View
-                    key={r.label}
-                    onLayout={e => { rankRowOffsets.current[r.label] = e.nativeEvent.layout.y; }}
-                    style={[styles.rankRow, { borderColor: isCurrent ? r.color : colors.border }, isCurrent && styles.rankRowActive]}
-                  >
-                    <View style={[styles.rankDot, { backgroundColor: r.color }]} />
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Text style={[styles.rankRowLabel, { color: r.color }]}>{r.label}</Text>
-                        {isCurrent && <Text style={styles.rankYouTag}>TOI</Text>}
-                      </View>
-                      <Text style={[styles.rankRowTitle, { color: colors.textMuted }]}>{r.desc}</Text>
-                      <Text style={[styles.rankRowStreak, { color: colors.textFaint }]}>
-                        SCORE {r.min === maxDisplay ? r.min : `${r.min}–${maxDisplay}`}
-                        {r.streakReq > 0 ? ` · STREAK ${r.streakReq}J` : ""}
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: "flex-end", marginLeft: 8 }}>
-                      <Text style={[styles.rankRowRange, { color: r.color }]}>{r.psl}</Text>
-                      <Text style={[styles.rankRowPop, { color: colors.textFaint }]}>{r.pop}</Text>
-                    </View>
-                  </View>
-                );
-              })}
-            </ScrollView>
-            <TouchableOpacity style={styles.rankModalClose} onPress={() => setRankModalOpen(false)}>
-              <Text style={[styles.rankModalCloseText, { color: colors.textSub }]}>Fermer</Text>
-            </TouchableOpacity>
-          </TouchableOpacity>
-        </TouchableOpacity>
-      </Modal>
-
+      <RankSheet
+        visible={echelleOuverte}
+        onClose={() => setEchelleOuverte(false)}
+        rangActuel={rang.label}
+      />
     </ScrollView>
   );
 }

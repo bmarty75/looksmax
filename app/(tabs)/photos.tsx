@@ -1,135 +1,169 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
-import { useMemo, useEffect, useState } from "react";
-import {
-  Dimensions, Image, Modal, ScrollView,
-  StyleSheet, Text, TouchableOpacity, View,
-} from "react-native";
+import { useCallback, useMemo, useState } from "react";
+import { Dimensions, Image, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { ConfirmDialog } from "../../components/ConfirmDialog";
+import { ScreenHeader } from "../../components/ScreenHeader";
+import { BigButton, Card, Pill, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { storage } from "../../hooks/useStorage";
-import { Photo, PhotoPick, choisirPhoto, grouperParMois, prendrePhoto } from "../../lib/photos";
+import { rangCourant } from "../../lib/metrics";
+import { Photo, PhotoPick, choisirPhoto, ecartEnJours, grouperParMois, prendrePhoto } from "../../lib/photos";
+import { loadProfile } from "../../lib/profile";
 
 const { width } = Dimensions.get("window");
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
-    root:          { flex: 1, backgroundColor: c.bg, paddingHorizontal: 16 },
-    header:        { paddingTop: 60, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 16, flexDirection: "row", alignItems: "flex-end" },
-    headerSub:     { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
-    headerTitle:   { fontSize: 24, fontWeight: "800", color: c.text },
-    actionRow:     { flexDirection: "row", gap: 10, marginBottom: 20 },
-    actionBtn:     { backgroundColor: "#C9A96E11", borderWidth: 1, borderColor: "#C9A96E44", borderRadius: 12, padding: 14, alignItems: "center" },
-    actionBtnText: { color: "#C9A96E", fontSize: 14, fontWeight: "700" },
-    emptyState:    { alignItems: "center", paddingTop: 60, paddingBottom: 40 },
-    emptyText:     { color: c.textFaint, fontSize: 14, textAlign: "center", lineHeight: 24 },
-    sectionLabel:  { fontSize: 10, letterSpacing: 3, color: c.textFaint, fontWeight: "700", marginBottom: 12 },
-    compareBtn:    { backgroundColor: "#C9A96E", borderRadius: 12, padding: 14, alignItems: "center", justifyContent: "center", flexDirection: "row", gap: 8, marginBottom: 22 },
-    compareText:   { color: "#000", fontSize: 14, fontWeight: "800" },
-    erreur:        { fontSize: 12, color: "#E07B5A", textAlign: "center", marginBottom: 14, fontWeight: "600" },
-    photoGrid:     { flexDirection: "row", flexWrap: "wrap", gap: 10 },
-    photoItem:     { borderRadius: 14, overflow: "hidden", backgroundColor: c.surface },
-    photoThumb:    { width: "100%", height: "100%" },
-    photoOverlay:  { position: "absolute", bottom: 0, left: 0, right: 0, padding: 10, paddingTop: 24, backgroundColor: "rgba(0,0,0,0.5)" },
-    photoDate:     { color: "#CCC", fontSize: 11, fontWeight: "700" },
-    // Lightbox reste toujours sombre quel que soit le thème
-    lightbox:      { flex: 1, backgroundColor: "#000e", alignItems: "center", justifyContent: "center", padding: 20 },
-    lightboxClose: { position: "absolute", top: 60, right: 20 },
-    lightboxImg:   { width: "100%", height: 400, borderRadius: 16 },
-    lightboxDate:  { color: "#555", fontSize: 12, letterSpacing: 1, marginTop: 12, fontWeight: "700" },
-    deleteBtn:     { marginTop: 20, backgroundColor: "#E07B5A22", borderWidth: 1, borderColor: "#E07B5A44", borderRadius: 10, paddingHorizontal: 24, paddingVertical: 12, flexDirection: "row", alignItems: "center", gap: 8 },
-    deleteBtnText: { color: "#E07B5A", fontSize: 14, fontWeight: "700" },
+    root:        { flex: 1, backgroundColor: c.bg },
+    content:     { paddingHorizontal: 16, paddingBottom: 30 },
+
+    actions:     { flexDirection: "row", gap: 10, marginBottom: 18 },
+    action:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: c.card, borderRadius: 16, paddingVertical: 15 },
+    actionTxt:   { fontSize: 13, fontWeight: "700" },
+
+    resumeRow:   { flexDirection: "row", justifyContent: "space-around", alignItems: "center" },
+    resumeItem:  { alignItems: "center" },
+    resumeVal:   { fontSize: 22, fontWeight: "800", color: c.text },
+    resumeNom:   { fontSize: 9, fontWeight: "700", letterSpacing: 0.8, color: c.textMuted, marginTop: 4 },
+    resumeSep:   { width: 1, height: 30, backgroundColor: c.border },
+
+    grille:      { flexDirection: "row", flexWrap: "wrap", gap: 10 },
+    vignette:    { borderRadius: 16, overflow: "hidden", backgroundColor: c.surface },
+    image:       { width: "100%", height: "100%" },
+    voile:       { position: "absolute", bottom: 0, left: 0, right: 0, padding: 10, paddingTop: 26, backgroundColor: "rgba(0,0,0,0.55)" },
+    voileTxt:    { color: "#EDEDED", fontSize: 11, fontWeight: "700" },
+
+    vide:        { alignItems: "center", paddingVertical: 40 },
+    videTxt:     { color: c.textMuted, fontSize: 13.5, textAlign: "center", lineHeight: 21, marginTop: 14 },
+
+    visionneuse: { flex: 1, backgroundColor: "#000E", alignItems: "center", justifyContent: "center", padding: 20 },
+    fermer:      { position: "absolute", top: 56, right: 20, flexDirection: "row", alignItems: "center", gap: 6 },
+    grandeImg:   { width: "100%", height: 420, borderRadius: 20 },
+    dateGrande:  { color: "#8A8A92", fontSize: 12, letterSpacing: 1, marginTop: 14, fontWeight: "700" },
+    supprimer:   { marginTop: 22, flexDirection: "row", alignItems: "center", gap: 8, backgroundColor: "#EFA08D1F", borderRadius: 14, paddingHorizontal: 22, paddingVertical: 13 },
+    supprimerTxt:{ color: "#EFA08D", fontSize: 13.5, fontWeight: "800" },
+    erreur:      { fontSize: 12, color: c.coral, textAlign: "center", marginBottom: 14, fontWeight: "600" },
   });
 }
 
-export default function Photos() {
+export default function Progression() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-
   const router = useRouter();
+
   const [photos, setPhotos]     = useState<Photo[]>([]);
-  const [selected, setSelected] = useState<Photo | null>(null);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [history, setHistory]   = useState<Record<string, number>>({});
+  const [avatar, setAvatar]     = useState<string | null>(null);
+  const [choisie, setChoisie]   = useState<Photo | null>(null);
+  const [confirme, setConfirme] = useState(false);
   const [erreur, setErreur]     = useState<string | null>(null);
 
-  useEffect(() => {
-    storage.get("lm_photos", []).then(p => setPhotos(Array.isArray(p) ? p : []));
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      storage.get("lm_photos", []).then(p => setPhotos(Array.isArray(p) ? p : []));
+      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      loadProfile().then(p => setAvatar(p.avatar));
+    }, []),
+  );
 
-  const savePhotos = async (p: Photo[]) => {
-    setPhotos(p);
-    await storage.set("lm_photos", p);
+  const enregistrer = async (liste: Photo[]) => {
+    setPhotos(liste);
+    await storage.set("lm_photos", liste);
   };
 
-  /** Ajoute la photo réduite renvoyée par le module, et met à jour le compteur. */
   const ajouter = async (pick: PhotoPick) => {
     if (!pick.ok) {
       if (pick.message) setErreur(pick.message);
       return;
     }
     setErreur(null);
-    await savePhotos([pick.photo, ...photos]);
+    await enregistrer([pick.photo, ...photos]);
     const s = await storage.get("lm_stats", { photos: 0 });
     await storage.set("lm_stats", { ...s, photos: (s.photos || 0) + 1 });
   };
 
-  const pickImage = async () => ajouter(await choisirPhoto());
-  const takePhoto = async () => ajouter(await prendrePhoto());
-
-  const deletePhoto = async (id: number) => {
-    await savePhotos(photos.filter(p => p.id !== id));
-    setConfirmingDelete(false);
-    setSelected(null);
+  const supprimer = async (id: number) => {
+    await enregistrer(photos.filter(p => p.id !== id));
+    setConfirme(false);
+    setChoisie(null);
   };
 
-  const imgSize = (width - 48) / 2;
+  const taille      = (width - 42) / 2;
+  const joursActifs = Object.values(history).filter(v => v > 0).length;
+  const suivi       = photos.length >= 2 ? ecartEnJours(photos[photos.length - 1], photos[0]) : null;
 
   return (
-    <ScrollView style={styles.root} contentContainerStyle={{ paddingBottom: 30 }}>
-      <View style={styles.header}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerSub}>LOOKSMAX OS</Text>
-          <Text style={styles.headerTitle}>Progression</Text>
-        </View>
-      </View>
+    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+      <ScreenHeader section="Progression" avatar={avatar} rang={rangCourant(history)} />
 
-      <View style={styles.actionRow}>
-        <TouchableOpacity style={[styles.actionBtn, { flex: 1 }]} onPress={takePhoto}>
-          <Text style={styles.actionBtnText}>📸 Caméra</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.actionBtn, { flex: 1, borderColor: "#7B9EE044" }]} onPress={pickImage}>
-          <Text style={[styles.actionBtnText, { color: "#7B9EE0" }]}>🖼️ Galerie</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Résumé du suivi */}
+      <Card style={{ marginBottom: 18 }}>
+        <View style={styles.resumeRow}>
+          <View style={styles.resumeItem}>
+            <Text style={[styles.resumeVal, { color: colors.amber }]}>{photos.length}</Text>
+            <Text style={styles.resumeNom}>PHOTOS</Text>
+          </View>
+          <View style={styles.resumeSep} />
+          <View style={styles.resumeItem}>
+            <Text style={[styles.resumeVal, { color: colors.green }]}>{suivi ?? 0}</Text>
+            <Text style={styles.resumeNom}>JOURS DE SUIVI</Text>
+          </View>
+          <View style={styles.resumeSep} />
+          <View style={styles.resumeItem}>
+            <Text style={[styles.resumeVal, { color: colors.coral }]}>{joursActifs}</Text>
+            <Text style={styles.resumeNom}>JOURS ACTIFS</Text>
+          </View>
+        </View>
+      </Card>
 
       {erreur && <Text style={styles.erreur}>{erreur}</Text>}
 
-      {photos.length >= 2 && (
-        <TouchableOpacity style={styles.compareBtn} onPress={() => router.push("/compare")}>
-          <MaterialIcons name="compare" size={17} color="#000" />
-          <Text style={styles.compareText}>Comparer avant / après</Text>
+      <View style={styles.actions}>
+        <TouchableOpacity style={styles.action} onPress={async () => ajouter(await prendrePhoto())}>
+          <MaterialIcons name="photo-camera" size={18} color={colors.amber} />
+          <Text style={[styles.actionTxt, { color: colors.amber }]}>Caméra</Text>
         </TouchableOpacity>
+        <TouchableOpacity style={styles.action} onPress={async () => ajouter(await choisirPhoto())}>
+          <MaterialIcons name="photo-library" size={18} color={colors.green} />
+          <Text style={[styles.actionTxt, { color: colors.green }]}>Galerie</Text>
+        </TouchableOpacity>
+      </View>
+
+      {photos.length >= 2 && (
+        <View style={{ marginBottom: 20 }}>
+          <BigButton
+            label="COMPARER AVANT / APRÈS"
+            onPress={() => router.push("/compare")}
+            icone={<MaterialIcons name="compare" size={18} color="#101014" />}
+          />
+        </View>
       )}
 
       {photos.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Text style={{ fontSize: 52, marginBottom: 16 }}>📸</Text>
-          <Text style={styles.emptyText}>Ajoute ta première photo{"\n"}pour tracker ton glow up !</Text>
-        </View>
+        <Card style={styles.vide}>
+          <MaterialIcons name="add-a-photo" size={40} color={colors.textFaint} />
+          <Text style={styles.videTxt}>
+            Ajoute ta première photo{"\n"}pour suivre ton évolution.
+          </Text>
+        </Card>
       ) : (
         grouperParMois(photos).map(groupe => (
           <View key={groupe.titre} style={{ marginBottom: 22 }}>
-            <Text style={styles.sectionLabel}>{groupe.titre} ({groupe.photos.length})</Text>
-            <View style={styles.photoGrid}>
+            <SectionTitle right={<Pill teinte={colors.card}>{groupe.photos.length}</Pill>}>
+              {groupe.titre}
+            </SectionTitle>
+            <View style={styles.grille}>
               {groupe.photos.map(ph => (
                 <TouchableOpacity
                   key={ph.id}
-                  style={[styles.photoItem, { width: imgSize, height: imgSize * 1.3 }]}
-                  onPress={() => setSelected(ph)}
+                  style={[styles.vignette, { width: taille, height: taille * 1.3 }]}
+                  onPress={() => setChoisie(ph)}
                 >
-                  <Image source={{ uri: ph.uri }} style={styles.photoThumb} />
-                  <View style={styles.photoOverlay}>
-                    <Text style={styles.photoDate}>{ph.date}</Text>
+                  <Image source={{ uri: ph.uri }} style={styles.image} />
+                  <View style={styles.voile}>
+                    <Text style={styles.voileTxt}>{ph.date}</Text>
                   </View>
                 </TouchableOpacity>
               ))}
@@ -138,18 +172,19 @@ export default function Photos() {
         ))
       )}
 
-      <Modal visible={!!selected} transparent animationType="fade">
-        <View style={styles.lightbox}>
-          <TouchableOpacity style={styles.lightboxClose} onPress={() => setSelected(null)}>
-            <Text style={{ color: "#888", fontSize: 16 }}>✕ Fermer</Text>
+      <Modal visible={!!choisie} transparent animationType="fade">
+        <View style={styles.visionneuse}>
+          <TouchableOpacity style={styles.fermer} onPress={() => setChoisie(null)}>
+            <MaterialIcons name="close" size={18} color="#8A8A92" />
+            <Text style={{ color: "#8A8A92", fontSize: 14, fontWeight: "700" }}>Fermer</Text>
           </TouchableOpacity>
-          {selected && (
+          {choisie && (
             <>
-              <Image source={{ uri: selected.uri }} style={styles.lightboxImg} resizeMode="contain" />
-              <Text style={styles.lightboxDate}>{selected.date}</Text>
-              <TouchableOpacity style={styles.deleteBtn} onPress={() => setConfirmingDelete(true)}>
-                <MaterialIcons name="delete-outline" size={16} color="#E07B5A" />
-                <Text style={styles.deleteBtnText}>Supprimer</Text>
+              <Image source={{ uri: choisie.uri }} style={styles.grandeImg} resizeMode="contain" />
+              <Text style={styles.dateGrande}>{choisie.date}</Text>
+              <TouchableOpacity style={styles.supprimer} onPress={() => setConfirme(true)}>
+                <MaterialIcons name="delete-outline" size={17} color="#EFA08D" />
+                <Text style={styles.supprimerTxt}>Supprimer</Text>
               </TouchableOpacity>
             </>
           )}
@@ -157,11 +192,11 @@ export default function Photos() {
       </Modal>
 
       <ConfirmDialog
-        visible={confirmingDelete}
+        visible={confirme}
         title="Supprimer cette photo ?"
         message="Cette photo sera définitivement supprimée de ta progression."
-        onCancel={() => setConfirmingDelete(false)}
-        onConfirm={() => selected && deletePhoto(selected.id)}
+        onCancel={() => setConfirme(false)}
+        onConfirm={() => choisie && supprimer(choisie.id)}
       />
     </ScrollView>
   );

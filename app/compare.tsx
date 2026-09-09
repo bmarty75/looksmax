@@ -17,14 +17,14 @@ function makeStyles(c: ThemeColors) {
     content:     { paddingHorizontal: 16, paddingBottom: 40 },
     header:      { paddingTop: 60, paddingBottom: 16, flexDirection: "row", alignItems: "center", gap: 12, borderBottomWidth: 1, borderBottomColor: c.border, marginBottom: 18 },
     backBtn:     { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: c.border2, alignItems: "center", justifyContent: "center", backgroundColor: c.card },
-    headerSub:   { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", marginBottom: 4 },
+    headerSub:   { fontSize: 10, letterSpacing: 4, color: c.amber, fontWeight: "700", marginBottom: 4 },
     headerTitle: { fontSize: 24, fontWeight: "800", color: c.text },
 
     modeRow:     { flexDirection: "row", gap: 8, marginBottom: 16 },
     modeBtn:     { flex: 1, paddingVertical: 9, borderRadius: 9, borderWidth: 1, borderColor: c.border2, alignItems: "center" },
-    modeBtnOn:   { borderColor: "#C9A96E55", backgroundColor: "#C9A96E11" },
+    modeBtnOn:   { borderColor: `${c.amber}55`, backgroundColor: `${c.amber}11` },
     modeTxt:     { fontSize: 11, fontWeight: "700", color: c.textFaint, letterSpacing: 0.5 },
-    modeTxtOn:   { color: "#C9A96E" },
+    modeTxtOn:   { color: c.amber },
 
     duo:         { flexDirection: "row", gap: 8, marginBottom: 14 },
     duoCol:      { flex: 1 },
@@ -35,8 +35,8 @@ function makeStyles(c: ThemeColors) {
     wipeWrap:    { width: "100%", aspectRatio: 0.8, borderRadius: 12, overflow: "hidden", backgroundColor: c.surface, marginBottom: 14 },
     wipeImg:     { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
     wipeClip:    { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-    wipeLine:    { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: "#C9A96E" },
-    wipeGrip:    { position: "absolute", width: 36, height: 36, borderRadius: 18, backgroundColor: "#C9A96E", alignItems: "center", justifyContent: "center" },
+    wipeLine:    { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: c.amber },
+    wipeGrip:    { position: "absolute", width: 36, height: 36, borderRadius: 18, backgroundColor: c.amber, alignItems: "center", justifyContent: "center" },
     wipeTag:     { position: "absolute", top: 10, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#000a" },
     wipeTagTxt:  { fontSize: 9, letterSpacing: 1.5, fontWeight: "800", color: "#fff" },
 
@@ -218,7 +218,7 @@ export default function CompareScreen() {
             </View>
             <View style={styles.duoCol}>
               {apres && <Image source={{ uri: apres.uri }} style={styles.duoImg} resizeMode="cover" />}
-              <Text style={[styles.duoLabel, { color: "#C9A96E" }]}>APRÈS</Text>
+              <Text style={[styles.duoLabel, { color: colors.amber }]}>APRÈS</Text>
               <Text style={styles.duoDate}>{apres?.date ?? "—"}</Text>
             </View>
           </View>
@@ -239,7 +239,7 @@ export default function CompareScreen() {
               style={[styles.wipeGrip, { left: `${ratio * 100}%`, marginLeft: -18, top: "50%", marginTop: -18 }]}
               pointerEvents="none"
             >
-              <MaterialIcons name="code" size={18} color="#000" />
+              <MaterialIcons name="code" size={18} color={colors.onAmber} />
             </View>
             <View style={[styles.wipeTag, { left: 10 }]} pointerEvents="none">
               <Text style={styles.wipeTagTxt}>APRÈS</Text>
@@ -252,17 +252,17 @@ export default function CompareScreen() {
 
         <View style={styles.statsCard}>
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#C9A96E" }]}>{jours ?? "—"}</Text>
+            <Text style={[styles.statNum, { color: colors.amber }]}>{jours ?? "—"}</Text>
             <Text style={styles.statLabel}>jours d'écart</Text>
           </View>
           <View style={styles.statDiv} />
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#7ECC8A" }]}>{joursActifs ?? "—"}</Text>
+            <Text style={[styles.statNum, { color: colors.green }]}>{joursActifs ?? "—"}</Text>
             <Text style={styles.statLabel}>jours actifs</Text>
           </View>
           <View style={styles.statDiv} />
           <View style={styles.stat}>
-            <Text style={[styles.statNum, { color: "#7B9EE0" }]}>
+            <Text style={[styles.statNum, { color: colors.amber }]}>
               {scoreAvant != null && scoreApres != null
                 ? `${scoreApres - scoreAvant >= 0 ? "+" : ""}${scoreApres - scoreAvant}`
                 : "—"}
@@ -272,7 +272,7 @@ export default function CompareScreen() {
         </View>
 
         {bandeau("PHOTO AVANT", avantId, setAvantId, colors.textMuted)}
-        {bandeau("PHOTO APRÈS", apresId, setApresId, "#C9A96E")}
+        {bandeau("PHOTO APRÈS", apresId, setApresId, colors.amber)}
       </ScrollView>
     </View>
   );

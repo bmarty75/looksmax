@@ -5,7 +5,9 @@ export type ThemeMode = "dark" | "light";
 
 export interface ThemeColors {
   bg: string;
+  /** Fond des cartes. */
   card: string;
+  /** Creux : pistes de barres, vignettes d'icônes, champs. */
   surface: string;
   input: string;
   border: string;
@@ -14,32 +16,55 @@ export interface ThemeColors {
   textSub: string;
   textMuted: string;
   textFaint: string;
+  /** Accent principal, doré. */
+  amber: string;
+  /** Réussite, valeurs en hausse. */
+  green: string;
+  /** Troisième mesure, alertes douces. */
+  coral: string;
+  /** Boutons pleins d'action principale. */
+  cream: string;
+  /**
+   * Couleur du texte et des icônes POSÉS SUR un aplat ambre. L'ambre est clair
+   * en thème sombre et foncé en thème clair : le contraste doit s'inverser.
+   */
+  onAmber: string;
 }
 
 export const DARK: ThemeColors = {
-  bg:        "#080808",
-  card:      "#0F0F0F",
-  surface:   "#141414",
-  input:     "#080808",
-  border:    "#1A1A1A",
-  border2:   "#222222",
-  text:      "#F0EAE0",
-  textSub:   "#888888",
-  textMuted: "#555555",
-  textFaint: "#444444",
+  bg:        "#0B0B0D",
+  card:      "#17171B",
+  surface:   "#202025",
+  input:     "#131316",
+  border:    "#232328",
+  border2:   "#2C2C32",
+  text:      "#FFFFFF",
+  textSub:   "#9A9AA2",
+  textMuted: "#6E6E77",
+  textFaint: "#4C4C54",
+  amber:     "#F2B01E",
+  green:     "#4BD68C",
+  coral:     "#EFA08D",
+  cream:     "#F6E3B6",
+  onAmber:   "#101014",
 };
 
 export const LIGHT: ThemeColors = {
-  bg:        "#F5F0EA",
+  bg:        "#F4F2EE",
   card:      "#FFFFFF",
-  surface:   "#EDE8E0",
-  input:     "#F5F0EA",
-  border:    "#E5DFD6",
-  border2:   "#D8D0C5",
-  text:      "#1A1209",
-  textSub:   "#665D54",
-  textMuted: "#8C8278",
-  textFaint: "#ABA39A",
+  surface:   "#EDEAE4",
+  input:     "#F4F2EE",
+  border:    "#E2DED7",
+  border2:   "#D2CDC4",
+  text:      "#141416",
+  textSub:   "#5E5E68",
+  textMuted: "#84848E",
+  textFaint: "#A6A6AE",
+  amber:     "#B4820A",
+  green:     "#1F9D5F",
+  coral:     "#C96A50",
+  cream:     "#E7C97E",
+  onAmber:   "#FFFFFF",
 };
 
 interface ThemeCtx {

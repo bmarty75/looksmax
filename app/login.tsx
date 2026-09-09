@@ -11,23 +11,23 @@ function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
     root:        { flex: 1, backgroundColor: c.bg },
     content:     { flexGrow: 1, justifyContent: "center", paddingHorizontal: 28, paddingVertical: 40 },
-    brand:       { fontSize: 10, letterSpacing: 4, color: "#C9A96E", fontWeight: "700", textAlign: "center" },
+    brand:       { fontSize: 10, letterSpacing: 4, color: c.amber, fontWeight: "700", textAlign: "center" },
     title:       { fontSize: 28, fontWeight: "800", color: c.text, textAlign: "center", marginTop: 6, marginBottom: 4 },
     subtitle:    { fontSize: 13, color: c.textMuted, textAlign: "center", marginBottom: 32 },
     label:       { fontSize: 10, letterSpacing: 2, color: c.textFaint, fontWeight: "700", marginBottom: 6 },
     input:       { backgroundColor: c.input, borderWidth: 1, borderColor: c.border2, borderRadius: 10, color: c.text, padding: 14, fontSize: 15, marginBottom: 16 },
-    submitBtn:   { backgroundColor: "#C9A96E", borderRadius: 12, padding: 16, alignItems: "center", marginTop: 4 },
-    submitText:  { color: "#000", fontSize: 14, fontWeight: "800", letterSpacing: 0.5 },
+    submitBtn:   { backgroundColor: c.amber, borderRadius: 12, padding: 16, alignItems: "center", marginTop: 4 },
+    submitText:  { color: c.onAmber, fontSize: 14, fontWeight: "800", letterSpacing: 0.5 },
     switchBtn:   { marginTop: 22, alignItems: "center", padding: 8 },
     switchText:  { fontSize: 13, color: c.textSub },
-    switchStrong:{ color: "#C9A96E", fontWeight: "700" },
+    switchStrong:{ color: c.amber, fontWeight: "700" },
     msg:         { fontSize: 12, textAlign: "center", marginBottom: 14, lineHeight: 18, fontWeight: "600" },
-    msgError:    { color: "#E07B5A" },
-    msgOk:       { color: "#7ECC8A" },
-    notice:      { backgroundColor: c.card, borderWidth: 1, borderColor: "#E0C55A44", borderLeftWidth: 3, borderLeftColor: "#E0C55A", borderRadius: 12, padding: 16, gap: 8 },
+    msgError:    { color: c.coral },
+    msgOk:       { color: c.green },
+    notice:      { backgroundColor: c.card, borderWidth: 1, borderColor: `${c.amber}44`, borderLeftWidth: 3, borderLeftColor: c.amber, borderRadius: 12, padding: 16, gap: 8 },
     noticeTitle: { fontSize: 13, fontWeight: "800", color: c.text },
     noticeText:  { fontSize: 12, color: c.textSub, lineHeight: 19 },
-    code:        { fontSize: 11, color: "#C9A96E", fontWeight: "700" },
+    code:        { fontSize: 11, color: c.amber, fontWeight: "700" },
   });
 }
 
@@ -129,7 +129,7 @@ export default function Login() {
 
         <TouchableOpacity style={styles.submitBtn} onPress={submit} disabled={busy}>
           {busy
-            ? <ActivityIndicator color="#000" />
+            ? <ActivityIndicator color={colors.onAmber} />
             : <Text style={styles.submitText}>{mode === "signin" ? "Se connecter" : "Créer mon compte"}</Text>}
         </TouchableOpacity>
 
