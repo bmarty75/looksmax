@@ -35,6 +35,7 @@ function RootNavigator() {
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="profile" />
       <Stack.Screen name="compare" />
+      <Stack.Screen name="friend/[id]" />
     </Stack>
   );
 }

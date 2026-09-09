@@ -26,12 +26,13 @@ export default function TabsLayout() {
         },
         tabBarActiveTintColor: colors.amber,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: "700", letterSpacing: 0.3 },
+        tabBarLabelStyle: { fontSize: 9, fontWeight: "700", letterSpacing: 0.2 },
       }}
     >
       <Tabs.Screen name="index"  options={{ title: "Biométrie",   tabBarIcon: icone("monitor-heart") }} />
       <Tabs.Screen name="habits" options={{ title: "Routines",    tabBarIcon: icone("checklist") }} />
       <Tabs.Screen name="goals"  options={{ title: "Objectifs",   tabBarIcon: icone("track-changes") }} />
+      <Tabs.Screen name="friends" options={{ title: "Amis",        tabBarIcon: icone("group") }} />
       <Tabs.Screen name="photos" options={{ title: "Progression", tabBarIcon: icone("insights") }} />
     </Tabs>
   );

@@ -6,6 +6,7 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { Partage, chargerPartage, enregistrerPartage, publierProfil } from "../lib/social";
 import { useAuth } from "../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
 import {
@@ -56,6 +57,12 @@ function makeStyles(c: ThemeColors) {
     themeBtn:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: c.border2, backgroundColor: c.card },
     themeBtnOn:    { borderColor: `${c.amber}66`, backgroundColor: `${c.amber}14` },
     themeTxt:      { fontSize: 13, fontWeight: "700", color: c.textSub },
+    partageLigne:  { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+    partageNom:    { fontSize: 14, fontWeight: "600", color: c.text },
+    partageSous:   { fontSize: 11.5, color: c.textMuted, marginTop: 2, lineHeight: 16 },
+    bascule:       { width: 46, height: 27, borderRadius: 14, padding: 3, justifyContent: "center" },
+    pastilleBasc:  { width: 21, height: 21, borderRadius: 11, backgroundColor: "#FFFFFF" },
+    noteConfid:    { fontSize: 11.5, color: c.textMuted, lineHeight: 17, marginTop: 6 },
   });
 }
 
@@ -78,6 +85,7 @@ export default function ProfileScreen() {
   const [mdpMsg, setMdpMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [deconnexionOuverte, setDeconnexionOuverte] = useState(false);
+  const [partage, setPartage] = useState<Partage | null>(null);
 
   useEffect(() => {
     loadProfile().then(p => {
@@ -85,7 +93,18 @@ export default function ProfileScreen() {
       setInitial(p);
       setChargement(false);
     });
+    chargerPartage().then(setPartage);
   }, []);
+
+  /** Bascule une rubrique et republie aussitôt : ce qui n'est plus partagé
+   *  doit disparaître du profil public sans attendre. */
+  const basculerPartage = async (cle: keyof Partage) => {
+    if (!partage) return;
+    const suivant = { ...partage, [cle]: !partage[cle] };
+    setPartage(suivant);
+    await enregistrerPartage(suivant);
+    await publierProfil();
+  };
 
   const modifie =
     profile.pseudo !== initial.pseudo ||
@@ -110,6 +129,7 @@ export default function ProfileScreen() {
     await saveProfile(nettoye);
     setProfile(nettoye);
     setInitial(nettoye);
+    await publierProfil();
     setProfilMsg({ text: "Profil enregistré.", ok: true });
   };
 
@@ -260,6 +280,44 @@ export default function ProfileScreen() {
               },
             )}
           </View>
+        </View>
+
+        <View style={styles.separator} />
+
+        {/* Ce que voient les amis */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>VISIBLE PAR MES AMIS</Text>
+          {partage && ([
+            ["stats",  "Score et régularité", "Ton index PSL, ton rang, ton streak."],
+            ["habits", "Mes routines",        "La liste de tes routines, sans le détail jour par jour."],
+            ["goals",  "Mes objectifs",       "Tes objectifs et leur avancement."],
+            ["photos", "Mes photos",          "Uniquement ta première et ta dernière photo."],
+          ] as [keyof Partage, string, string][]).map(([cle, titre, detail]) => {
+            const actif = partage[cle];
+            return (
+              <TouchableOpacity
+                key={cle}
+                style={styles.partageLigne}
+                onPress={() => basculerPartage(cle)}
+                activeOpacity={0.7}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.partageNom}>{titre}</Text>
+                  <Text style={styles.partageSous}>{detail}</Text>
+                </View>
+                <View style={[
+                  styles.bascule,
+                  { backgroundColor: actif ? colors.green : colors.surface, alignItems: actif ? "flex-end" : "flex-start" },
+                ]}>
+                  <View style={styles.pastilleBasc} />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+          <Text style={styles.noteConfid}>
+            Seuls tes amis acceptés voient ces informations. Ce que tu désactives
+            est retiré de ton profil public immédiatement.
+          </Text>
         </View>
 
         <View style={styles.separator} />
