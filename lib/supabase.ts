@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { Platform } from "react-native";
 
 const url = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
 const anonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
@@ -15,11 +16,22 @@ export const supabase = createClient(
       storage: AsyncStorage,
       autoRefreshToken: true,
       persistSession: true,
-      // Pas de redirection OAuth : on est en e-mail/mot de passe.
-      detectSessionInUrl: false,
+      // Le lien de réinitialisation dépose son jeton dans le fragment de
+      // l'URL : sans cette détection, cliquer sur l'e-mail ne ferait rien.
+      // Sur mobile, le lien passe par le schéma « looksmax:// » et c'est le
+      // système, pas la barre d'adresse, qui transporte le jeton.
+      detectSessionInUrl: Platform.OS === "web",
     },
   },
 );
+
+/** Où Supabase renvoie l'utilisateur après le clic sur l'e-mail de récupération. */
+export function urlRetourRecuperation(): string {
+  if (Platform.OS === "web" && typeof window !== "undefined") {
+    return `${window.location.origin}/reset-password`;
+  }
+  return "looksmax://reset-password";
+}
 
 /** Table clé/valeur par utilisateur (voir supabase/schema.sql). */
 export const USER_DATA_TABLE = "user_data";

@@ -22,6 +22,8 @@ function makeStyles(c: ThemeColors) {
     switchBtn:   { marginTop: 22, alignItems: "center", padding: 8 },
     switchText:  { fontSize: 13, color: c.textSub },
     switchStrong:{ color: c.amber, fontWeight: "700" },
+    oubliBtn:    { marginTop: 14, alignItems: "center", padding: 6 },
+    oubliTxt:    { fontSize: 12.5, color: c.textMuted, fontWeight: "600" },
     msg:         { fontSize: 12, textAlign: "center", marginBottom: 14, lineHeight: 18, fontWeight: "600" },
     msgError:    { color: c.coral },
     msgOk:       { color: c.green },
@@ -37,9 +39,9 @@ function makeStyles(c: ThemeColors) {
 export default function Login() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, envoyerLienReinitialisation } = useAuth();
 
-  const [mode, setMode]         = useState<"signin" | "signup">("signin");
+  const [mode, setMode]         = useState<"signin" | "signup" | "oubli">("signin");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [pseudo, setPseudo]     = useState("");
@@ -60,6 +62,16 @@ export default function Login() {
 
   const submit = async () => {
     if (busy) return;
+
+    if (mode === "oubli") {
+      setBusy(true);
+      setNotice(null);
+      const res = await envoyerLienReinitialisation(email);
+      setBusy(false);
+      if (res.message) setNotice({ text: res.message, ok: res.ok });
+      return;
+    }
+
     if (!email.trim() || !password) {
       setNotice({ text: "Renseigne ton e-mail et ton mot de passe.", ok: false });
       return;
@@ -95,11 +107,13 @@ export default function Login() {
     }
   };
 
-  const changerMode = () => {
-    setMode(mode === "signin" ? "signup" : "signin");
+  const allerVers = (m: "signin" | "signup" | "oubli") => {
+    setMode(m);
     setNotice(null);
     setDispo(null);
   };
+
+  const changerMode = () => allerVers(mode === "signin" ? "signup" : "signin");
 
   /** Message sous le champ pseudo : format fautif, ou disponibilité. */
   const aidePseudo = (): { texte: string; style: object } => {
@@ -133,11 +147,15 @@ export default function Login() {
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.brand}>LOOKSMAX OS</Text>
-        <Text style={styles.title}>{mode === "signin" ? "Connexion" : "Créer un compte"}</Text>
+        <Text style={styles.title}>
+          {mode === "signin" ? "Connexion" : mode === "signup" ? "Créer un compte" : "Mot de passe oublié"}
+        </Text>
         <Text style={styles.subtitle}>
           {mode === "signin"
             ? "Retrouve ta progression sur tous tes appareils"
-            : "Ta progression sera sauvegardée en ligne"}
+            : mode === "signup"
+              ? "Ta progression sera sauvegardée en ligne"
+              : "Indique ton adresse : tu recevras un lien pour en choisir un nouveau."}
         </Text>
 
         {notice && (
@@ -176,6 +194,8 @@ export default function Login() {
           textContentType="emailAddress"
         />
 
+        {mode !== "oubli" && (
+          <>
         <Text style={styles.label}>MOT DE PASSE</Text>
         <TextInput
           style={styles.input}
@@ -189,17 +209,26 @@ export default function Login() {
           onSubmitEditing={submit}
           returnKeyType="go"
         />
+          </>
+        )}
 
         <TouchableOpacity style={styles.submitBtn} onPress={submit} disabled={busy}>
           {busy
             ? <ActivityIndicator color={colors.onAmber} />
-            : <Text style={styles.submitText}>{mode === "signin" ? "Se connecter" : "Créer mon compte"}</Text>}
+            : (
+              <Text style={styles.submitText}>
+                {mode === "signin" ? "Se connecter" : mode === "signup" ? "Créer mon compte" : "Envoyer le lien"}
+              </Text>
+            )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.switchBtn}
-          onPress={changerMode}
-        >
+        {mode === "signin" && (
+          <TouchableOpacity style={styles.oubliBtn} onPress={() => allerVers("oubli")}>
+            <Text style={styles.oubliTxt}>Mot de passe oublié ?</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity style={styles.switchBtn} onPress={changerMode}>
           <Text style={styles.switchText}>
             {mode === "signin" ? "Pas encore de compte ? " : "Déjà un compte ? "}
             <Text style={styles.switchStrong}>

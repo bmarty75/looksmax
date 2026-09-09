@@ -3,7 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { adoptLegacyData, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
 import { EMPTY_PROFILE, reserverPseudo, saveProfile } from "../lib/profile";
-import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase } from "../lib/supabase";
+import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase, urlRetourRecuperation } from "../lib/supabase";
 
 /**
  * Session déjà mémorisée sur l'appareil, lue directement pour un
@@ -42,6 +42,12 @@ interface AuthCtx {
   signUp: (email: string, password: string, pseudo: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<AuthResult>;
+  /** Envoie l'e-mail contenant le lien de réinitialisation. */
+  envoyerLienReinitialisation: (email: string) => Promise<AuthResult>;
+  /** true quand l'utilisateur arrive depuis ce lien et doit choisir un mot de passe. */
+  recuperation: boolean;
+  /** Pose le nouveau mot de passe et met fin à la récupération. */
+  definirMotDePasse: (nouveau: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthCtx>({
@@ -53,6 +59,9 @@ const AuthContext = createContext<AuthCtx>({
   signUp: async () => ({ ok: false, message: null }),
   signOut: async () => {},
   changePassword: async () => ({ ok: false, message: null }),
+  envoyerLienReinitialisation: async () => ({ ok: false, message: null }),
+  recuperation: false,
+  definirMotDePasse: async () => ({ ok: false, message: null }),
 });
 
 /** Traduit les messages d'erreur Supabase, qui sont en anglais. */
@@ -61,7 +70,12 @@ function traduireErreur(message: string): string {
   if (m.includes("invalid login credentials")) return "E-mail ou mot de passe incorrect.";
   if (m.includes("user already registered")) return "Un compte existe déjà avec cet e-mail.";
   if (m.includes("password should be at least")) return "Le mot de passe doit faire au moins 6 caractères.";
-  if (m.includes("unable to validate email") || m.includes("invalid email")) return "Adresse e-mail invalide.";
+  // Supabase formule le refus de plusieurs façons : « invalid email »,
+  // « unable to validate email », ou « Email address "x" is invalid ».
+  if (m.includes("unable to validate email") || m.includes("invalid email")
+      || m.includes("email_address_invalid") || (m.includes("email address") && m.includes("is invalid"))) {
+    return "Adresse e-mail invalide.";
+  }
   if (m.includes("email not confirmed")) return "Confirme ton e-mail avant de te connecter.";
   // Supabase plafonne l'envoi d'e-mails à quelques-uns par heure.
   if (m.includes("email rate limit") || m.includes("over_email_send_rate_limit")) {
@@ -78,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [recuperation, setRecuperation] = useState(false);
 
   // Comptes déjà rattachés pendant cette session d'app : sert à ne montrer
   // l'écran de synchro qu'à la première connexion d'un compte, et pas à
@@ -135,7 +150,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange(async (event, s) => {
+      // Le lien de l'e-mail ouvre une session valide : sans ce drapeau,
+      // l'utilisateur atterrirait sur le tableau de bord sans jamais avoir
+      // choisi de nouveau mot de passe, et le lien resterait la seule clé.
+      if (event === "PASSWORD_RECOVERY") setRecuperation(true);
       await activate(s);
       setSession(s);
       setLoading(false);
@@ -188,6 +207,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
     setActiveUser(null);
     setSession(null);
+    setRecuperation(false);
+  };
+
+  const envoyerLienReinitialisation = async (email: string): Promise<AuthResult> => {
+    const adresse = email.trim();
+    if (!adresse) return { ok: false, message: "Renseigne ton adresse e-mail." };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(adresse, {
+        redirectTo: urlRetourRecuperation(),
+      });
+      if (error) return { ok: false, message: traduireErreur(error.message) };
+      // Réponse volontairement identique que l'adresse existe ou non : dire
+      // « ce compte n'existe pas » permettrait de savoir qui est inscrit.
+      return {
+        ok: true,
+        message: "Si un compte existe avec cette adresse, le lien vient d'y être envoyé. Pense à regarder tes indésirables.",
+      };
+    } catch {
+      return { ok: false, message: "Connexion au serveur impossible." };
+    }
+  };
+
+  const definirMotDePasse = async (nouveau: string): Promise<AuthResult> => {
+    try {
+      const { error } = await supabase.auth.updateUser({ password: nouveau });
+      if (error) {
+        const m = error.message.toLowerCase();
+        if (m.includes("should be different")) {
+          return { ok: false, message: "Choisis un mot de passe différent de l'ancien." };
+        }
+        // Le lien n'est valable qu'une heure et qu'une fois.
+        if (m.includes("session") || m.includes("expired") || m.includes("token")) {
+          return { ok: false, message: "Ce lien a expiré. Redemande-en un depuis l'écran de connexion." };
+        }
+        return { ok: false, message: traduireErreur(error.message) };
+      }
+      setRecuperation(false);
+      return { ok: true, message: "Mot de passe modifié." };
+    } catch {
+      return { ok: false, message: "Connexion au serveur impossible." };
+    }
   };
 
   const changePassword = async (current: string, next: string): Promise<AuthResult> => {
@@ -235,6 +295,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUp,
         signOut,
         changePassword,
+        envoyerLienReinitialisation,
+        recuperation,
+        definirMotDePasse,
       }}
     >
       {children}
