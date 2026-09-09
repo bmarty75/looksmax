@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { AreaChart, BigButton, Card, MiniRing, Pill, ProgressBar, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { COLORS, DEFAULT_GOALS, ICONS } from "../../constants/data";
+import { COLORS, ICONS } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { rangCourant, serieScore } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
@@ -78,7 +78,8 @@ export default function Objectifs() {
 
   useFocusEffect(
     useCallback(() => {
-      storage.get("lm_goals", DEFAULT_GOALS).then(g => setGoals(Array.isArray(g) ? g : DEFAULT_GOALS));
+      // Aucun objectif d'exemple : chacun crée les siens.
+      storage.get("lm_goals", []).then(g => setGoals(Array.isArray(g) ? g : []));
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
       loadProfile().then(p => setAvatar(p.avatar));
     }, []),

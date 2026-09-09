@@ -1,7 +1,7 @@
 import { storage } from "../hooks/useStorage";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
-import { DEFAULT_GOALS, DEFAULT_HABITS, getRank, todayKey } from "../constants/data";
+import { DEFAULT_HABITS, getRank, todayKey } from "../constants/data";
 import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
 
@@ -68,11 +68,12 @@ async function construireInstantane(): Promise<Omit<ProfilPublic, "user_id">> {
   const partage = await chargerPartage();
   const profil = await loadProfile();
   const history: Record<string, number> = await storage.get("lm_history", {});
-  // Mêmes valeurs par défaut que les écrans : tant que rien n'a été modifié,
-  // rien n'est écrit en stockage, et publier [] afficherait un profil vide
-  // alors que l'appli montre bien les routines de départ.
+  // Même repli que l'écran Routines : tant que rien n'a été modifié, rien
+  // n'est écrit en stockage, et publier [] afficherait un profil sans aucune
+  // routine alors que l'appli montre bien celles de départ. Les objectifs,
+  // eux, partent d'une liste vide.
   const habits: any[] = await storage.get("lm_habits", DEFAULT_HABITS);
-  const goals: any[] = await storage.get("lm_goals", DEFAULT_GOALS);
+  const goals: any[] = await storage.get("lm_goals", []);
   const photos: Photo[] = await storage.get("lm_photos", []);
 
   let stats: StatsPartagees | Record<string, never> = {};

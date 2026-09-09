@@ -9,12 +9,9 @@ export const DEFAULT_HABITS = [
     { id: "sunscreen", icon: "☀️", label: "SPF", category: "skin", color: "#E0C55A" },
   ];
   
-  export const DEFAULT_GOALS = [
-    { id: "g1", label: "Perdre 5kg", target: 100, unit: "%", icon: "⚖️", color: "#E07B5A", progress: 68 },
-    { id: "g2", label: "Streak 30 jours", target: 30, unit: "j", icon: "🔥", color: "#C9A96E", progress: 12 },
-    { id: "g3", label: "Skincare routine", target: 21, unit: "j", icon: "✨", color: "#5AC4D4", progress: 14 },
-  ];
-  
+  // Pas d'objectifs par défaut : un nouveau compte démarre avec une liste
+  // vide et crée les siens depuis l'écran Objectifs.
+
   // Échelle PSL (1–10). `min`/`max` = plage du score de régularité (0–100),
   // `streakReq` = streak minimum exigé en plus du score pour débloquer le palier.
   export const RANKS = [
