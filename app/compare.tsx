@@ -8,6 +8,7 @@ import {
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
 import { storage } from "../hooks/useStorage";
 import { Photo, ecartEnJours, moyenneScore, photoDateKey } from "../lib/photos";
+import { useUrlsPhotos } from "../hooks/useUrlsPhotos";
 
 type Mode = "cote" | "curseur";
 
@@ -63,6 +64,7 @@ export default function CompareScreen() {
   const router = useRouter();
 
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const urls = useUrlsPhotos(photos);
   const [history, setHistory] = useState<Record<string, number>>({});
   const [avantId, setAvantId] = useState<number | null>(null);
   const [apresId, setApresId] = useState<number | null>(null);
@@ -174,7 +176,7 @@ export default function CompareScreen() {
           {photos.map(p => (
             <TouchableOpacity key={p.id} onPress={() => choisir(p.id)}>
               <View style={[styles.thumb, choisi === p.id && { borderColor: teinte }]}>
-                <Image source={{ uri: p.uri }} style={styles.thumbImg} />
+                <Image source={{ uri: urls[p.id] }} style={styles.thumbImg} />
               </View>
               <Text style={styles.thumbDate}>{p.date}</Text>
             </TouchableOpacity>
@@ -212,23 +214,23 @@ export default function CompareScreen() {
         {mode === "cote" ? (
           <View style={styles.duo}>
             <View style={styles.duoCol}>
-              {avant && <Image source={{ uri: avant.uri }} style={styles.duoImg} resizeMode="cover" />}
+              {avant && <Image source={{ uri: urls[avant.id] }} style={styles.duoImg} resizeMode="cover" />}
               <Text style={[styles.duoLabel, { color: colors.textMuted }]}>AVANT</Text>
               <Text style={styles.duoDate}>{avant?.date ?? "—"}</Text>
             </View>
             <View style={styles.duoCol}>
-              {apres && <Image source={{ uri: apres.uri }} style={styles.duoImg} resizeMode="cover" />}
+              {apres && <Image source={{ uri: urls[apres.id] }} style={styles.duoImg} resizeMode="cover" />}
               <Text style={[styles.duoLabel, { color: colors.amber }]}>APRÈS</Text>
               <Text style={styles.duoDate}>{apres?.date ?? "—"}</Text>
             </View>
           </View>
         ) : (
           <View ref={zone} style={styles.wipeWrap} onLayout={onLayout} {...pan.panHandlers}>
-            {avant && <Image source={{ uri: avant.uri }} style={styles.wipeImg} resizeMode="cover" />}
+            {avant && <Image source={{ uri: urls[avant.id] }} style={styles.wipeImg} resizeMode="cover" />}
             <View style={[styles.wipeClip, { width: `${ratio * 100}%` }]}>
               {apres && (
                 <Image
-                  source={{ uri: apres.uri }}
+                  source={{ uri: urls[apres.id] }}
                   style={[styles.wipeImg, { width: largeur.current || undefined }]}
                   resizeMode="cover"
                 />

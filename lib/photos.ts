@@ -1,6 +1,7 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { cleJour } from "./dates";
+import { televerser } from "./stockagePhotos";
 
 export interface Photo {
   id: number;
@@ -8,7 +9,14 @@ export interface Photo {
   date: string;
   /** Date ISO (AAAA-MM-JJ) : sert aux calculs et au tri. Absente sur les photos d'avant. */
   dateKey?: string;
-  uri: string;
+  /** Emplacement dans le bucket « photos ». C'est le cas normal. */
+  chemin?: string;
+  /**
+   * Image en base64. Ne subsiste que le temps qu'un dépôt réussisse : une
+   * photo prise hors ligne reste ainsi lisible et repart au prochain
+   * démarrage. Les photos d'avant la migration en ont encore une.
+   */
+  uri?: string;
 }
 
 /** Côté le plus long, en pixels. Assez net pour comparer, assez léger pour synchroniser. */
@@ -32,13 +40,22 @@ async function versPhoto(uri: string): Promise<PhotoPick> {
   if (!image.base64) return { ok: false, message: "Impossible de lire cette image." };
 
   const maintenant = new Date();
+  const id = Date.now();
+
+  // Le bucket d'abord. S'il est injoignable, on garde l'image en local :
+  // mieux vaut une ligne temporairement lourde qu'une photo perdue. La
+  // migration la reprendra à la prochaine ouverture de l'écran.
+  const chemin = await televerser(image.base64, id);
+
   return {
     ok: true,
     photo: {
-      id: Date.now(),
+      id,
       date: maintenant.toLocaleDateString("fr-FR"),
       dateKey: cleJour(maintenant),
-      uri: `data:image/jpeg;base64,${image.base64}`,
+      ...(chemin
+        ? { chemin }
+        : { uri: `data:image/jpeg;base64,${image.base64}` }),
     },
   };
 }

@@ -78,6 +78,13 @@ begin
   if moi is null then
     raise exception 'Aucune session' using errcode = '28000';
   end if;
+
+  -- Les photos ne peuvent pas partir d'ici : Supabase refuse toute écriture
+  -- directe dans storage.objects (« Direct deletion from storage tables is
+  -- not allowed »), et l'exception ferait échouer la suppression entière.
+  -- C'est donc l'app qui vide le dossier par l'API Storage juste avant
+  -- d'appeler cette fonction. Un fichier qui survivrait resterait de toute
+  -- façon illisible : sa règle d'accès exige un compte qui n'existe plus.
   delete from auth.users where id = moi;
 end;
 $$;

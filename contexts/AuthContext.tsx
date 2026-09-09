@@ -3,6 +3,7 @@ import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { adoptLegacyData, effacerDonneesLocales, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
 import { EMPTY_PROFILE, reserverPseudo, saveProfile } from "../lib/profile";
+import { viderMonDossier } from "../lib/stockagePhotos";
 import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase, urlRetourRecuperation } from "../lib/supabase";
 
 /**
@@ -231,6 +232,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           ? { ok: false, message: "Mot de passe incorrect." }
           : { ok: false, message: traduireErreur(erreurVerif.message) };
       }
+
+      // Les fichiers d'abord : Supabase refuse toute suppression directe dans
+      // ses tables de stockage, donc la fonction SQL ne peut pas s'en charger.
+      // Si ça échoue, on efface quand même le compte : ce que la personne a
+      // demandé prime, et un fichier orphelin reste illisible faute d'un
+      // compte à qui sa règle d'accès puisse correspondre.
+      await viderMonDossier();
 
       const { error } = await supabase.rpc("supprimer_mon_compte");
       if (error) {

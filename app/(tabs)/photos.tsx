@@ -10,6 +10,8 @@ import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { storage } from "../../hooks/useStorage";
 import { rangCourant } from "../../lib/metrics";
 import { Photo, PhotoPick, choisirPhoto, ecartEnJours, grouperParMois, prendrePhoto } from "../../lib/photos";
+import { migrerPhotos, supprimerFichier } from "../../lib/stockagePhotos";
+import { useUrlsPhotos } from "../../hooks/useUrlsPhotos";
 import { loadProfile } from "../../lib/profile";
 
 const { width } = Dimensions.get("window");
@@ -60,9 +62,21 @@ export default function Progression() {
   const [confirme, setConfirme] = useState(false);
   const [erreur, setErreur]     = useState<string | null>(null);
 
+  const urls = useUrlsPhotos(photos);
+
   useFocusEffect(
     useCallback(() => {
-      storage.get("lm_photos", []).then(p => setPhotos(Array.isArray(p) ? p : []));
+      storage.get("lm_photos", []).then(async liste => {
+        const p: Photo[] = Array.isArray(liste) ? liste : [];
+        setPhotos(p);
+        // Reprise des photos encore stockées en base64. Silencieuse : si le
+        // réseau manque, elles restent lisibles et repasseront plus tard.
+        const reprises = await migrerPhotos(p);
+        if (reprises) {
+          setPhotos(reprises);
+          await storage.set("lm_photos", reprises);
+        }
+      });
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
       loadProfile().then(p => setAvatar(p.avatar));
     }, []),
@@ -85,7 +99,12 @@ export default function Progression() {
   };
 
   const supprimer = async (id: number) => {
+    const cible = photos.find(p => p.id === id);
     await enregistrer(photos.filter(p => p.id !== id));
+    // Le fichier part après la liste : si le retrait distant échoue, la
+    // photo a quand même disparu de l'écran, et le ménage se fera à la
+    // suppression du compte.
+    await supprimerFichier(cible?.chemin);
     setConfirme(false);
     setChoisie(null);
   };
@@ -161,7 +180,7 @@ export default function Progression() {
                   style={[styles.vignette, { width: taille, height: taille * 1.3 }]}
                   onPress={() => setChoisie(ph)}
                 >
-                  <Image source={{ uri: ph.uri }} style={styles.image} />
+                  <Image source={{ uri: urls[ph.id] }} style={styles.image} />
                   <View style={styles.voile}>
                     <Text style={styles.voileTxt}>{ph.date}</Text>
                   </View>
@@ -180,7 +199,7 @@ export default function Progression() {
           </TouchableOpacity>
           {choisie && (
             <>
-              <Image source={{ uri: choisie.uri }} style={styles.grandeImg} resizeMode="contain" />
+              <Image source={{ uri: urls[choisie.id] }} style={styles.grandeImg} resizeMode="contain" />
               <Text style={styles.dateGrande}>{choisie.date}</Text>
               <TouchableOpacity style={styles.supprimer} onPress={() => setConfirme(true)}>
                 <MaterialIcons name="delete-outline" size={17} color="#EFA08D" />

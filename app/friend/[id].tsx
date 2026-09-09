@@ -6,6 +6,7 @@ import { Card, Pill, ProgressBar, Rings, SectionTitle } from "../../components/u
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { initiales } from "../../lib/profile";
 import { ProfilPublic, StatsPartagees, chargerProfilAmi } from "../../lib/social";
+import { useUrlsPhotos } from "../../hooks/useUrlsPhotos";
 
 function makeStyles(c: ThemeColors) {
   return StyleSheet.create({
@@ -76,6 +77,14 @@ export default function ProfilAmi() {
 
   const [profil, setProfil] = useState<ProfilPublic | null>(null);
   const [chargement, setChargement] = useState(true);
+
+  // L'avant/après de l'ami vit dans son propre dossier du bucket : la règle
+  // de lecture l'autorise entre amis acceptés, et la signature est demandée
+  // ici, par le client qui regarde.
+  const duo = profil?.photos && "avant" in profil.photos
+    ? [profil.photos.avant, profil.photos.apres]
+    : [];
+  const urls = useUrlsPhotos(duo);
 
   useEffect(() => {
     if (!id) return;
@@ -260,12 +269,12 @@ export default function ProfilAmi() {
       ) : (
         <View style={styles.duo}>
           <View style={styles.duoCol}>
-            <Image source={{ uri: profil.photos.avant.uri }} style={styles.duoImg} resizeMode="cover" />
+            <Image source={{ uri: urls[profil.photos.avant.id] }} style={styles.duoImg} resizeMode="cover" />
             <Text style={[styles.duoLabel, { color: colors.textMuted }]}>AVANT</Text>
             <Text style={styles.duoDate}>{profil.photos.avant.date}</Text>
           </View>
           <View style={styles.duoCol}>
-            <Image source={{ uri: profil.photos.apres.uri }} style={styles.duoImg} resizeMode="cover" />
+            <Image source={{ uri: urls[profil.photos.apres.id] }} style={styles.duoImg} resizeMode="cover" />
             <Text style={[styles.duoLabel, { color: colors.amber }]}>APRÈS</Text>
             <Text style={styles.duoDate}>{profil.photos.apres.date}</Text>
           </View>
