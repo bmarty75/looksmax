@@ -53,6 +53,10 @@ function makeStyles(c: ThemeColors) {
     msgOk:         { color: c.green },
     msgError:      { color: c.coral },
     separator:     { height: 1, backgroundColor: c.border, marginBottom: 24 },
+    zoneTitre:     { fontSize: 10, letterSpacing: 3, color: c.coral, fontWeight: "700", marginBottom: 10 },
+    zoneTexte:     { fontSize: 12, color: c.textMuted, lineHeight: 18, marginBottom: 14 },
+    supprimerBtn:  { borderWidth: 1, borderColor: `${c.coral}55`, borderRadius: 12, padding: 15, alignItems: "center", marginTop: 4 },
+    supprimerTxt:  { color: c.coral, fontSize: 13, fontWeight: "800" },
     themeRow:      { flexDirection: "row", gap: 10 },
     themeBtn:      { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 12, borderWidth: 1, borderColor: c.border2, backgroundColor: c.card },
     themeBtnOn:    { borderColor: `${c.amber}66`, backgroundColor: `${c.amber}14` },
@@ -70,7 +74,7 @@ export default function ProfileScreen() {
   const { colors, mode, toggle } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const router = useRouter();
-  const { email, signOut, changePassword } = useAuth();
+  const { email, signOut, changePassword, supprimerCompte } = useAuth();
 
   const [profile, setProfile] = useState<Profile>(EMPTY_PROFILE);
   const [initial, setInitial] = useState<Profile>(EMPTY_PROFILE);
@@ -86,6 +90,10 @@ export default function ProfileScreen() {
   const [mdpMsg, setMdpMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [deconnexionOuverte, setDeconnexionOuverte] = useState(false);
+  const [suppressionOuverte, setSuppressionOuverte] = useState(false);
+  const [mdpSuppression, setMdpSuppression]         = useState("");
+  const [suppressionOccupee, setSuppressionOccupee] = useState(false);
+  const [suppressionMsg, setSuppressionMsg]         = useState<string | null>(null);
   const [partage, setPartage] = useState<Partage | null>(null);
 
   useEffect(() => {
@@ -158,6 +166,22 @@ export default function ProfileScreen() {
     setProfile(nettoye);
     setInitial(nettoye);
     setProfilMsg({ text: "Profil enregistré.", ok: true });
+  };
+
+  const validerSuppression = async () => {
+    if (suppressionOccupee) return;
+    setSuppressionOccupee(true);
+    setSuppressionMsg(null);
+    const res = await supprimerCompte(mdpSuppression);
+    setSuppressionOccupee(false);
+    if (res.ok) {
+      // La navigation ramène d'elle-même sur l'écran de connexion : la
+      // session est fermée.
+      setSuppressionOuverte(false);
+      setMdpSuppression("");
+      return;
+    }
+    setSuppressionMsg(res.message);
   };
 
   const validerMotDePasse = async () => {
@@ -408,6 +432,69 @@ export default function ProfileScreen() {
         <TouchableOpacity style={styles.dangerBtn} onPress={() => setDeconnexionOuverte(true)}>
           <Text style={styles.dangerText}>Se déconnecter</Text>
         </TouchableOpacity>
+
+        <View style={{ height: 28 }} />
+        <View style={styles.separator} />
+
+        {/* Zone de danger : irréversible, donc dépliée à la demande et
+            confirmée par le mot de passe. */}
+        <Text style={styles.zoneTitre}>ZONE DE DANGER</Text>
+        {!suppressionOuverte ? (
+          <>
+            <Text style={styles.zoneTexte}>
+              Supprimer ton compte efface définitivement ton historique, tes
+              routines, tes objectifs, tes photos et tes liens d&apos;amitié.
+              Rien n&apos;est récupérable ensuite.
+            </Text>
+            <TouchableOpacity
+              style={styles.supprimerBtn}
+              onPress={() => { setSuppressionOuverte(true); setSuppressionMsg(null); }}
+            >
+              <Text style={styles.supprimerTxt}>Supprimer mon compte</Text>
+            </TouchableOpacity>
+          </>
+        ) : (
+          <>
+            <Text style={styles.zoneTexte}>
+              Saisis ton mot de passe pour confirmer. Cette action est
+              immédiate et sans retour possible.
+            </Text>
+
+            {suppressionMsg && (
+              <Text style={[styles.msg, styles.msgError]}>{suppressionMsg}</Text>
+            )}
+
+            <Text style={styles.label}>MOT DE PASSE</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="••••••••"
+              placeholderTextColor={colors.textFaint}
+              value={mdpSuppression}
+              onChangeText={setMdpSuppression}
+              secureTextEntry
+              autoCapitalize="none"
+              onSubmitEditing={validerSuppression}
+              returnKeyType="go"
+            />
+
+            <TouchableOpacity
+              style={styles.dangerBtn}
+              onPress={validerSuppression}
+              disabled={suppressionOccupee}
+            >
+              {suppressionOccupee
+                ? <ActivityIndicator color={colors.coral} />
+                : <Text style={styles.dangerText}>Supprimer définitivement</Text>}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.secondaryBtn}
+              onPress={() => { setSuppressionOuverte(false); setMdpSuppression(""); setSuppressionMsg(null); }}
+            >
+              <Text style={styles.secondaryText}>Annuler</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </ScrollView>
 
       <ConfirmDialog

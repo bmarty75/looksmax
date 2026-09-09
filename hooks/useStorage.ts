@@ -64,6 +64,11 @@ export const storage = {
     }
   },
   set: async (key: string, value: any) => {
+    // Au démarrage, les onglets se montent le temps d'une image avant que la
+    // navigation ne renvoie vers la connexion : sans ce garde-fou, ils
+    // écrivent un historique vide dans l'espace « lm:local: », commun à tous
+    // les comptes de l'appareil et que rien ne relit jamais.
+    if (!DEVICE_KEYS.has(key) && !activeUserId) return;
     try {
       await AsyncStorage.setItem(namespaced(key), JSON.stringify(value));
       queuePush(key, value);
@@ -126,6 +131,29 @@ export async function pushAllToCloud(): Promise<void> {
     }
   } catch {
     // réseau indisponible : les données restent en local
+  }
+}
+
+/**
+ * Efface du cache local tout ce qui appartient au compte actif.
+ * Appelé après la suppression du compte : sans ça, les habitudes, l'historique
+ * et les photos resteraient lisibles sur l'appareil, et la personne suivante
+ * à se connecter les verrait réapparaître si l'identifiant était réutilisé.
+ * Les préférences de l'appareil (thème) ne sont pas touchées.
+ */
+export async function effacerDonneesLocales(): Promise<void> {
+  if (!activeUserId) return;
+  pending.clear();
+  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  try {
+    const prefix = `lm:${activeUserId}:`;
+    // « lm:local: » part aussi : c'est le résidu laissé par les versions
+    // antérieures au garde-fou de storage.set, et il n'appartient à personne.
+    const keys = (await AsyncStorage.getAllKeys())
+      .filter(k => k.startsWith(prefix) || k.startsWith("lm:local:"));
+    if (keys.length > 0) await AsyncStorage.multiRemove(keys);
+  } catch {
+    // Rien à rattraper : le compte n'existe plus côté serveur de toute façon.
   }
 }
 

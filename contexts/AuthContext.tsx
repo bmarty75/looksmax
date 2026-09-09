@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { adoptLegacyData, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
+import { adoptLegacyData, effacerDonneesLocales, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
 import { EMPTY_PROFILE, reserverPseudo, saveProfile } from "../lib/profile";
 import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase, urlRetourRecuperation } from "../lib/supabase";
 
@@ -48,6 +48,8 @@ interface AuthCtx {
   recuperation: boolean;
   /** Pose le nouveau mot de passe et met fin à la récupération. */
   definirMotDePasse: (nouveau: string) => Promise<AuthResult>;
+  /** Efface définitivement le compte et toutes ses données. */
+  supprimerCompte: (motDePasse: string) => Promise<AuthResult>;
 }
 
 const AuthContext = createContext<AuthCtx>({
@@ -62,6 +64,7 @@ const AuthContext = createContext<AuthCtx>({
   envoyerLienReinitialisation: async () => ({ ok: false, message: null }),
   recuperation: false,
   definirMotDePasse: async () => ({ ok: false, message: null }),
+  supprimerCompte: async () => ({ ok: false, message: null }),
 });
 
 /** Traduit les messages d'erreur Supabase, qui sont en anglais. */
@@ -210,6 +213,49 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setRecuperation(false);
   };
 
+  const supprimerCompte = async (motDePasse: string): Promise<AuthResult> => {
+    const adresse = session?.user?.email;
+    if (!adresse) return { ok: false, message: "Session expirée, reconnecte-toi." };
+    if (!motDePasse) return { ok: false, message: "Saisis ton mot de passe pour confirmer." };
+
+    try {
+      // Même précaution que pour le changement de mot de passe : un appareil
+      // déverrouillé laissé sans surveillance ne doit pas suffire à effacer
+      // un compte, et c'est ici irréversible.
+      const { error: erreurVerif } = await supabase.auth.signInWithPassword({
+        email: adresse,
+        password: motDePasse,
+      });
+      if (erreurVerif) {
+        return erreurVerif.message.toLowerCase().includes("invalid login credentials")
+          ? { ok: false, message: "Mot de passe incorrect." }
+          : { ok: false, message: traduireErreur(erreurVerif.message) };
+      }
+
+      const { error } = await supabase.rpc("supprimer_mon_compte");
+      if (error) {
+        // La fonction n'existe pas encore : mieux vaut le dire que laisser
+        // croire que le compte a été effacé.
+        if (error.code === "PGRST202" || error.message.includes("supprimer_mon_compte")) {
+          return { ok: false, message: "Suppression indisponible : la fonction manque côté serveur." };
+        }
+        return { ok: false, message: traduireErreur(error.message) };
+      }
+
+      // Le compte n'existe plus : on efface la trace locale avant de fermer
+      // la session, tant qu'on sait encore à quel identifiant elle appartient.
+      await effacerDonneesLocales();
+      await supabase.auth.signOut();
+      setActiveUser(null);
+      setSession(null);
+      setRecuperation(false);
+      seenUsers.current.clear();
+      return { ok: true, message: null };
+    } catch {
+      return { ok: false, message: "Connexion au serveur impossible." };
+    }
+  };
+
   const envoyerLienReinitialisation = async (email: string): Promise<AuthResult> => {
     const adresse = email.trim();
     if (!adresse) return { ok: false, message: "Renseigne ton adresse e-mail." };
@@ -298,6 +344,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         envoyerLienReinitialisation,
         recuperation,
         definirMotDePasse,
+        supprimerCompte,
       }}
     >
       {children}
