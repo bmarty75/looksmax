@@ -11,7 +11,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
 import {
   BIO_MAX, EMPTY_PROFILE, PSEUDO_MAX, Profile,
-  initiales, loadProfile, pickAvatar, saveProfile,
+  initiales, loadProfile, pickAvatar, pseudoDisponible, saveProfile, verifierPseudo,
 } from "../lib/profile";
 
 function makeStyles(c: ThemeColors) {
@@ -76,6 +76,7 @@ export default function ProfileScreen() {
   const [initial, setInitial] = useState<Profile>(EMPTY_PROFILE);
   const [chargement, setChargement] = useState(true);
   const [avatarOccupe, setAvatarOccupe] = useState(false);
+  const [profilOccupe, setProfilOccupe] = useState(false);
   const [profilMsg, setProfilMsg] = useState<{ text: string; ok: boolean } | null>(null);
 
   const [actuel, setActuel] = useState("");
@@ -121,15 +122,41 @@ export default function ProfileScreen() {
   };
 
   const enregistrerProfil = async () => {
+    if (profilOccupe) return;
     const nettoye: Profile = {
       pseudo: profile.pseudo.trim().slice(0, PSEUDO_MAX),
       bio: profile.bio.trim().slice(0, BIO_MAX),
       avatar: profile.avatar,
     };
+
+    const refus = verifierPseudo(nettoye.pseudo);
+    if (refus) { setProfilMsg({ text: refus, ok: false }); return; }
+
+    setProfilOccupe(true);
+    setProfilMsg(null);
+
+    if (nettoye.pseudo.toLowerCase() !== initial.pseudo.toLowerCase()
+        && await pseudoDisponible(nettoye.pseudo) === "pris") {
+      setProfilOccupe(false);
+      setProfilMsg({ text: "Ce pseudo est déjà pris. Choisis-en un autre.", ok: false });
+      return;
+    }
+
     await saveProfile(nettoye);
+    const publication = await publierProfil();
+    setProfilOccupe(false);
+
+    // L'index unique a le dernier mot : quelqu'un a pu prendre le pseudo
+    // entre la vérification et l'écriture. On remet alors l'ancien.
+    if (publication.pseudoPris) {
+      await saveProfile(initial);
+      setProfile(initial);
+      setProfilMsg({ text: "Ce pseudo vient d'être pris. Choisis-en un autre.", ok: false });
+      return;
+    }
+
     setProfile(nettoye);
     setInitial(nettoye);
-    await publierProfil();
     setProfilMsg({ text: "Profil enregistré.", ok: true });
   };
 
@@ -246,11 +273,15 @@ export default function ProfileScreen() {
           <TouchableOpacity
             style={[styles.primaryBtn, !modifie && styles.primaryOff]}
             onPress={enregistrerProfil}
-            disabled={!modifie}
+            disabled={!modifie || profilOccupe}
           >
-            <Text style={[styles.primaryText, !modifie && { color: colors.textMuted }]}>
-              {modifie ? "Enregistrer les modifications" : "Aucune modification"}
-            </Text>
+            {profilOccupe ? (
+              <ActivityIndicator color={colors.onAmber} />
+            ) : (
+              <Text style={[styles.primaryText, !modifie && { color: colors.textMuted }]}>
+                {modifie ? "Enregistrer les modifications" : "Aucune modification"}
+              </Text>
+            )}
           </TouchableOpacity>
         </View>
 

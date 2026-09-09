@@ -171,3 +171,62 @@ as $$
 $$;
 
 grant execute on function public.identites_liees() to authenticated;
+
+-- ─── Un pseudo unique par compte ─────────────────────────────
+--  L'unicité est imposée ici et pas seulement dans l'app : deux inscriptions
+--  simultanées passeraient sinon la même vérification avant que l'une écrive.
+
+-- Des comptes ont pu prendre le même pseudo avant cette contrainte. Plutôt
+-- que d'échouer, on suffixe les arrivants les plus récents ; ils pourront le
+-- changer depuis leur profil.
+update public.profiles p
+   set pseudo = left(p.pseudo, 15) || '_' || substr(p.user_id::text, 1, 4)
+  from (
+    select user_id,
+           row_number() over (partition by lower(pseudo) order by updated_at) as rang
+      from public.profiles
+     where pseudo <> ''
+  ) d
+ where p.user_id = d.user_id and d.rang > 1;
+
+-- Partiel : les comptes créés avant cette fonctionnalité n'ont pas de pseudo,
+-- et une chaîne vide ne doit pas entrer en collision avec une autre.
+create unique index if not exists profiles_pseudo_unique
+  on public.profiles (lower(pseudo)) where pseudo <> '';
+
+-- Format : 3 à 20 caractères, lettres, chiffres, « _ », « . » ou « - ».
+-- « not valid » n'inspecte pas les lignes déjà présentes, mais s'applique à
+-- toute écriture ultérieure.
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.profiles'::regclass and conname = 'pseudo_format'
+  ) then
+    alter table public.profiles
+      add constraint pseudo_format
+      check (pseudo = '' or pseudo ~ '^[A-Za-z0-9_.-]{3,20}$') not valid;
+  end if;
+end
+$$;
+
+-- ─── Ce pseudo est-il libre ? ────────────────────────────────
+--  SECURITY DEFINER : répondre demande de regarder les profils des autres,
+--  ce que la RLS interdit. Ne renvoie qu'un oui/non, jamais à qui il
+--  appartient. Le sien compte comme libre, pour pouvoir réenregistrer son
+--  profil sans changer de pseudo.
+create or replace function public.pseudo_disponible(recherche text)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select not exists (
+    select 1 from public.profiles p
+     where lower(p.pseudo) = lower(trim(recherche))
+       and p.user_id is distinct from auth.uid()
+  );
+$$;
+
+grant execute on function public.pseudo_disponible(text) to authenticated;

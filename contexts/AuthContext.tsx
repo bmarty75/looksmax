@@ -1,7 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
-import { adoptLegacyData, pullFromCloud, setActiveUser } from "../hooks/useStorage";
+import { adoptLegacyData, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
+import { EMPTY_PROFILE, reserverPseudo, saveProfile } from "../lib/profile";
 import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase } from "../lib/supabase";
 
 /**
@@ -38,7 +39,7 @@ interface AuthCtx {
   /** true pendant la récupération des données du compte, juste après connexion. */
   syncing: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string, pseudo: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<AuthResult>;
 }
@@ -152,16 +153,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string): Promise<AuthResult> => {
+  const signUp = async (email: string, password: string, pseudo: string): Promise<AuthResult> => {
+    const nom = pseudo.trim();
     try {
       const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
       if (error) return { ok: false, message: traduireErreur(error.message) };
+
       // Si la confirmation par e-mail est activée dans Supabase, aucune session
       // n'est ouverte tout de suite : on le dit clairement plutôt que de laisser
-      // l'utilisateur devant un écran qui ne bouge pas.
+      // l'utilisateur devant un écran qui ne bouge pas. Le pseudo ne peut pas
+      // être réservé sans session ; il le sera au premier enregistrement.
       if (!data.session) {
         return { ok: true, message: "Compte créé. Ouvre l'e-mail de confirmation, puis reviens te connecter." };
       }
+
+      // Le pseudo est posé tout de suite, sans attendre la première visite de
+      // l'onglet Amis : sans ça, il resterait libre et un autre pourrait le
+      // prendre entre-temps. On rattache d'abord le stockage au compte, sinon
+      // le profil irait dans l'espace « déconnecté ».
+      const uid = data.session.user.id;
+      setActiveUser(uid);
+      seenUsers.current.add(uid);            // pas d'écran de synchro : rien à récupérer
+      await saveProfile({ ...EMPTY_PROFILE, pseudo: nom });
+      await reserverPseudo(uid, nom);
+      await pushAllToCloud();
+
       return { ok: true, message: null };
     } catch {
       return { ok: false, message: "Connexion au serveur impossible." };

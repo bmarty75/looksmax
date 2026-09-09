@@ -1,6 +1,7 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { storage } from "../hooks/useStorage";
+import { isSupabaseConfigured, supabase } from "./supabase";
 
 export interface Profile {
   pseudo: string;
@@ -12,8 +13,63 @@ export interface Profile {
 export const PROFILE_KEY = "lm_profile";
 export const EMPTY_PROFILE: Profile = { pseudo: "", bio: "", avatar: null };
 
+export const PSEUDO_MIN = 3;
 export const PSEUDO_MAX = 20;
 export const BIO_MAX = 160;
+
+/** Doit rester aligné sur la contrainte « pseudo_format » de social.sql. */
+const PSEUDO_AUTORISE = /^[A-Za-z0-9_.-]+$/;
+
+/** Renvoie le motif du refus, ou null si le pseudo est acceptable. */
+export function verifierPseudo(pseudo: string): string | null {
+  const p = pseudo.trim();
+  if (p.length === 0) return "Choisis un pseudo.";
+  if (p.length < PSEUDO_MIN) return `Le pseudo doit faire au moins ${PSEUDO_MIN} caractères.`;
+  if (p.length > PSEUDO_MAX) return `Le pseudo ne doit pas dépasser ${PSEUDO_MAX} caractères.`;
+  if (!PSEUDO_AUTORISE.test(p)) return "Lettres, chiffres, « _ », « . » et « - » uniquement.";
+  return null;
+}
+
+export type Disponibilite = "libre" | "pris" | "inconnu";
+
+/**
+ * Demande au serveur si le pseudo est déjà porté par quelqu'un d'autre.
+ * Le sien compte comme libre. « inconnu » quand le serveur est injoignable :
+ * l'appelant décide alors s'il tente quand même l'écriture, que l'index
+ * unique refusera le cas échéant.
+ */
+export async function pseudoDisponible(pseudo: string): Promise<Disponibilite> {
+  if (!isSupabaseConfigured) return "inconnu";
+  try {
+    const { data, error } = await supabase.rpc("pseudo_disponible", { recherche: pseudo.trim() });
+    if (error || typeof data !== "boolean") return "inconnu";
+    return data ? "libre" : "pris";
+  } catch {
+    return "inconnu";
+  }
+}
+
+/** Vrai si l'erreur Postgres vient de l'index unique sur le pseudo. */
+export function estPseudoDejaPris(erreur: { code?: string; message?: string } | null): boolean {
+  if (!erreur) return false;
+  return erreur.code === "23505" || (erreur.message ?? "").includes("profiles_pseudo_unique");
+}
+
+/**
+ * Pose le pseudo dans public.profiles dès la création du compte, pour qu'il
+ * soit réservé sans attendre la première publication du profil.
+ */
+export async function reserverPseudo(userId: string, pseudo: string): Promise<boolean> {
+  if (!isSupabaseConfigured) return false;
+  try {
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ user_id: userId, pseudo: pseudo.trim() }, { onConflict: "user_id" });
+    return !error;
+  } catch {
+    return false;
+  }
+}
 
 /** Côté de l'avatar en pixels : suffisant pour l'affichage, léger à synchroniser. */
 const AVATAR_SIZE = 256;

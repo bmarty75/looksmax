@@ -2,7 +2,7 @@ import { storage } from "../hooks/useStorage";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
 import { DEFAULT_GOALS, DEFAULT_HABITS, getRank, todayKey } from "../constants/data";
-import { loadProfile } from "./profile";
+import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
 
 /* ─── Réglages de partage ─────────────────────────────────── */
@@ -127,20 +127,26 @@ async function construireInstantane(): Promise<Omit<ProfilPublic, "user_id">> {
   };
 }
 
+export interface Publication {
+  ok: boolean;
+  /** Vrai si l'écriture a buté sur l'index unique du pseudo. */
+  pseudoPris: boolean;
+}
+
 /** Publie l'instantané. Ne lève jamais : hors ligne, on réessaiera plus tard. */
-export async function publierProfil(): Promise<boolean> {
-  if (!isSupabaseConfigured) return false;
+export async function publierProfil(): Promise<Publication> {
+  if (!isSupabaseConfigured) return { ok: false, pseudoPris: false };
   try {
     const { data } = await supabase.auth.getUser();
     const uid = data.user?.id;
-    if (!uid) return false;
+    if (!uid) return { ok: false, pseudoPris: false };
     const instantane = await construireInstantane();
     const { error } = await supabase
       .from("profiles")
       .upsert({ user_id: uid, ...instantane }, { onConflict: "user_id" });
-    return !error;
+    return { ok: !error, pseudoPris: estPseudoDejaPris(error) };
   } catch {
-    return false;
+    return { ok: false, pseudoPris: false };
   }
 }
 

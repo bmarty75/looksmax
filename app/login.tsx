@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
+import { Disponibilite, PSEUDO_MAX, pseudoDisponible, verifierPseudo } from "../lib/profile";
 import { isSupabaseConfigured } from "../lib/supabase";
 
 function makeStyles(c: ThemeColors) {
@@ -24,6 +25,8 @@ function makeStyles(c: ThemeColors) {
     msg:         { fontSize: 12, textAlign: "center", marginBottom: 14, lineHeight: 18, fontWeight: "600" },
     msgError:    { color: c.coral },
     msgOk:       { color: c.green },
+    aide:        { fontSize: 11, marginTop: -10, marginBottom: 16, lineHeight: 16, fontWeight: "600" },
+    aideNeutre:  { color: c.textMuted },
     notice:      { backgroundColor: c.card, borderWidth: 1, borderColor: `${c.amber}44`, borderLeftWidth: 3, borderLeftColor: c.amber, borderRadius: 12, padding: 16, gap: 8 },
     noticeTitle: { fontSize: 13, fontWeight: "800", color: c.text },
     noticeText:  { fontSize: 12, color: c.textSub, lineHeight: 19 },
@@ -39,8 +42,21 @@ export default function Login() {
   const [mode, setMode]         = useState<"signin" | "signup">("signin");
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
+  const [pseudo, setPseudo]     = useState("");
+  const [dispo, setDispo]       = useState<Disponibilite | null>(null);
   const [notice, setNotice]     = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy]         = useState(false);
+
+  const pseudoFautif = mode === "signup" && pseudo.length > 0 ? verifierPseudo(pseudo) : null;
+
+  // Vérification différée : on interroge le serveur quand la frappe s'arrête,
+  // pas à chaque touche. L'index unique reste l'arbitre au moment de créer.
+  useEffect(() => {
+    setDispo(null);
+    if (mode !== "signup" || verifierPseudo(pseudo)) return;
+    const t = setTimeout(async () => setDispo(await pseudoDisponible(pseudo)), 450);
+    return () => clearTimeout(t);
+  }, [pseudo, mode]);
 
   const submit = async () => {
     if (busy) return;
@@ -48,11 +64,27 @@ export default function Login() {
       setNotice({ text: "Renseigne ton e-mail et ton mot de passe.", ok: false });
       return;
     }
-    setBusy(true);
+
+    if (mode === "signup") {
+      const refus = verifierPseudo(pseudo);
+      if (refus) { setNotice({ text: refus, ok: false }); return; }
+      setBusy(true);
+      // Dernière vérification juste avant la création : le pseudo a pu être
+      // pris entre la frappe et l'envoi.
+      if (await pseudoDisponible(pseudo) === "pris") {
+        setBusy(false);
+        setDispo("pris");
+        setNotice({ text: "Ce pseudo est déjà pris. Choisis-en un autre.", ok: false });
+        return;
+      }
+    } else {
+      setBusy(true);
+    }
+
     setNotice(null);
     const result = mode === "signin"
       ? await signIn(email, password)
-      : await signUp(email, password);
+      : await signUp(email, password, pseudo);
     setBusy(false);
     if (result.message) setNotice({ text: result.message, ok: result.ok });
     // Compte créé mais e-mail à confirmer : on ramène sur la connexion,
@@ -61,6 +93,20 @@ export default function Login() {
       setMode("signin");
       setPassword("");
     }
+  };
+
+  const changerMode = () => {
+    setMode(mode === "signin" ? "signup" : "signin");
+    setNotice(null);
+    setDispo(null);
+  };
+
+  /** Message sous le champ pseudo : format fautif, ou disponibilité. */
+  const aidePseudo = (): { texte: string; style: object } => {
+    if (pseudoFautif) return { texte: pseudoFautif, style: styles.msgError };
+    if (dispo === "pris") return { texte: "Ce pseudo est déjà pris.", style: styles.msgError };
+    if (dispo === "libre") return { texte: "Ce pseudo est disponible.", style: styles.msgOk };
+    return { texte: "3 à 20 caractères. C'est le nom que tes amis verront.", style: styles.aideNeutre };
   };
 
   if (!isSupabaseConfigured) {
@@ -100,6 +146,23 @@ export default function Login() {
           </Text>
         )}
 
+        {mode === "signup" && (
+          <>
+            <Text style={styles.label}>PSEUDO</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="ton pseudo"
+              placeholderTextColor={colors.textFaint}
+              value={pseudo}
+              onChangeText={t => setPseudo(t.slice(0, PSEUDO_MAX))}
+              autoCapitalize="none"
+              autoCorrect={false}
+              maxLength={PSEUDO_MAX}
+            />
+            <Text style={[styles.aide, aidePseudo().style]}>{aidePseudo().texte}</Text>
+          </>
+        )}
+
         <Text style={styles.label}>E-MAIL</Text>
         <TextInput
           style={styles.input}
@@ -135,7 +198,7 @@ export default function Login() {
 
         <TouchableOpacity
           style={styles.switchBtn}
-          onPress={() => { setMode(mode === "signin" ? "signup" : "signin"); setNotice(null); }}
+          onPress={changerMode}
         >
           <Text style={styles.switchText}>
             {mode === "signin" ? "Pas encore de compte ? " : "Déjà un compte ? "}
