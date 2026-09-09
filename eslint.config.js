@@ -5,6 +5,8 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // .expo est régénéré par Expo à chaque démarrage : le linter n'a rien à
+    // y redire, et ses avertissements masquaient les vrais.
+    ignores: ['dist/*', '.expo/*'],
   },
 ]);

@@ -7,10 +7,13 @@ type NomIcone = React.ComponentProps<typeof MaterialIcons>["name"];
 export default function TabsLayout() {
   const { colors, mode } = useTheme();
 
-  const icone = (name: NomIcone) =>
-    ({ focused }: { focused: boolean }) => (
+  const icone = (name: NomIcone) => {
+    const IconeOnglet = ({ focused }: { focused: boolean }) => (
       <MaterialIcons name={name} size={22} color={focused ? colors.amber : colors.textMuted} />
     );
+    IconeOnglet.displayName = `IconeOnglet(${name})`;
+    return IconeOnglet;
+  };
 
   return (
     <Tabs

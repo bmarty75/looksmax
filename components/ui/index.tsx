@@ -119,10 +119,9 @@ export function Rings({
   return (
     <View style={{ width: taille, height: taille, alignItems: "center", justifyContent: "center" }}>
       <Svg width={taille} height={taille} style={{ position: "absolute", transform: [{ rotate: "-90deg" }] }}>
-        {valeurs.map((a, i) => {
+        {/* Pistes de fond : un cercle complet, sans découpe. */}
+        {valeurs.map((_, i) => {
           const r = centre - epaisseur / 2 - i * (epaisseur + ecart);
-          const circonference = 2 * Math.PI * r;
-          const reste = circonference - (Math.max(0, Math.min(100, a.valeur)) / 100) * circonference;
           return (
             <Circle
               key={`piste-${i}`}

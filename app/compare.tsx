@@ -158,7 +158,7 @@ export default function CompareScreen() {
             <Text style={{ fontSize: 46 }}>📸</Text>
             <Text style={styles.emptyTxt}>
               Il faut au moins deux photos pour comparer.{"\n"}
-              Ajoute-en depuis l'onglet Photos.
+              Ajoute-en depuis l&apos;onglet Photos.
             </Text>
           </View>
         </ScrollView>
@@ -253,7 +253,7 @@ export default function CompareScreen() {
         <View style={styles.statsCard}>
           <View style={styles.stat}>
             <Text style={[styles.statNum, { color: colors.amber }]}>{jours ?? "—"}</Text>
-            <Text style={styles.statLabel}>jours d'écart</Text>
+            <Text style={styles.statLabel}>jours d&apos;écart</Text>
           </View>
           <View style={styles.statDiv} />
           <View style={styles.stat}>
