@@ -2,6 +2,7 @@ import { storage } from "../hooks/useStorage";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
 import { DEFAULT_HABITS, getRank, todayKey } from "../constants/data";
+import { cleJour } from "./dates";
 import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
 
@@ -87,7 +88,7 @@ async function construireInstantane(): Promise<Omit<ProfilPublic, "user_id">> {
     for (let i = 0; i < 7; i++) {
       const d = new Date();
       d.setDate(d.getDate() - i);
-      const jour = await storage.get(`lm_checked_${d.toISOString().slice(0, 10)}`, {});
+      const jour = await storage.get(`lm_checked_${cleJour(d)}`, {});
       if (jour && typeof jour === "object") {
         Object.entries(jour as Record<string, boolean>).forEach(([id, v]) => {
           if (v) counts[id] = (counts[id] || 0) + 1;

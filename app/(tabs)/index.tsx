@@ -8,6 +8,7 @@ import { AreaChart, Card, Pill, ProgressBar, Rings, SectionTitle, Sparkline } fr
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { DEFAULT_HABITS, getRank, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { cleJour } from "../../lib/dates";
 import {
   compute30DayAvg, computeCompositeScore, computeCurrentStreak, indexPsl,
   partsParCategorie, projectionRangSuivant, serieCompletion, serieScore,
@@ -108,7 +109,7 @@ export default function Biometrie() {
           for (let i = 0; i < 7; i++) {
             const d = new Date();
             d.setDate(d.getDate() - i);
-            const dc = await storage.get(`lm_checked_${d.toISOString().slice(0, 10)}`, {});
+            const dc = await storage.get(`lm_checked_${cleJour(d)}`, {});
             if (dc && typeof dc === "object") {
               Object.entries(dc as Record<string, boolean>).forEach(([id, v]) => {
                 if (v) counts[id] = (counts[id] || 0) + 1;
@@ -157,7 +158,7 @@ export default function Biometrie() {
   const semaine = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(lundi);
     d.setDate(lundi.getDate() + i);
-    const k = d.toISOString().slice(0, 10);
+    const k = cleJour(d);
     return { date: d, cle: k, actif: (history[k] || 0) > 0, cejour: k === todayKey() };
   });
 

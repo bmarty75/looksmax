@@ -8,6 +8,7 @@ import { AreaChart, BigButton, Card, MiniRing, Pill, ProgressBar, SectionTitle }
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { COLORS, ICONS } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { cleJour } from "../../lib/dates";
 import { rangCourant, serieScore } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
 
@@ -119,7 +120,7 @@ export default function Objectifs() {
   const jours30 = Array.from({ length: 30 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - i);
-    return history[d.toISOString().slice(0, 10)] || 0;
+    return history[cleJour(d)] || 0;
   });
   const discipline = Math.round(jours30.reduce((a, b) => a + b, 0) / 30);
 

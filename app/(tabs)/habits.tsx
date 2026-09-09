@@ -11,22 +11,19 @@ import { BigButton, Card, Pill, SegmentBar } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { decalerCle, jourDepuisCle } from "../../lib/dates";
 import { computeCurrentStreak, rangCourant } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
 
 const MOIS_COURTS = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
 
-function decalerJour(cle: string, delta: number): string {
-  const d = new Date(cle);
-  d.setUTCDate(d.getUTCDate() + delta);
-  return d.toISOString().slice(0, 10);
-}
+const decalerJour = decalerCle;
 
 function libelleJour(cle: string): string {
   if (cle === todayKey()) return "Aujourd'hui";
   if (cle === decalerJour(todayKey(), -1)) return "Hier";
-  const d = new Date(cle);
-  return `${String(d.getUTCDate()).padStart(2, "0")} ${MOIS_COURTS[d.getUTCMonth()]}`;
+  const d = jourDepuisCle(cle);
+  return `${String(d.getDate()).padStart(2, "0")} ${MOIS_COURTS[d.getMonth()]}`;
 }
 
 function makeStyles(c: ThemeColors) {

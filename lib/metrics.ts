@@ -1,11 +1,10 @@
 import { RANKS, getRank } from "../constants/data";
+import { cleJour as cle } from "./dates";
 
 /* ─── Score de régularité (20 % jour, 40 % streak, 40 % moyenne 30 j) ─── */
 
 export const STREAK_MAX_DAYS = 60;
 export const AVG_WINDOW_DAYS = 30;
-
-const cle = (d: Date) => d.toISOString().slice(0, 10);
 
 export function computeCurrentStreak(history: Record<string, number>): number {
   const d = new Date();

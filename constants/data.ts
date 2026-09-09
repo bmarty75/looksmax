@@ -1,3 +1,5 @@
+import { cleJour } from "../lib/dates";
+
 export const DEFAULT_HABITS = [
     { id: "skincare", icon: "✨", label: "Skincare", category: "skin", color: "#C9A96E" },
     { id: "workout", icon: "💪", label: "Workout", category: "body", color: "#E07B5A" },
@@ -91,4 +93,4 @@ export const DEFAULT_HABITS = [
     return RANKS[idx];
   };
   
-  export const todayKey = () => new Date().toISOString().slice(0, 10);
+  export const todayKey = () => cleJour();

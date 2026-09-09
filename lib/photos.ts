@@ -1,5 +1,6 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
+import { cleJour } from "./dates";
 
 export interface Photo {
   id: number;
@@ -36,7 +37,7 @@ async function versPhoto(uri: string): Promise<PhotoPick> {
     photo: {
       id: Date.now(),
       date: maintenant.toLocaleDateString("fr-FR"),
-      dateKey: maintenant.toISOString().slice(0, 10),
+      dateKey: cleJour(maintenant),
       uri: `data:image/jpeg;base64,${image.base64}`,
     },
   };
