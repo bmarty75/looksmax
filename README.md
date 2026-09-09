@@ -16,23 +16,48 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npx expo start
    ```
 
+## Tests
+
+```bash
+npm test          # une passe
+npm run test:watch
+```
+
+Ils portent sur la logique pure : les clés de journée, le calcul du score,
+du streak et du rang, le regroupement des photos, la validation du pseudo et
+le décodage base64. C'est là qu'une erreur passe inaperçue le plus longtemps,
+puisqu'elle ne casse rien de visible — elle fausse seulement des chiffres.
+
+Deux d'entre eux gardent l'app et la base alignées : le format du pseudo doit
+correspondre à la contrainte `pseudo_format` de `social.sql`, et les tranches
+de rang ne doivent laisser ni trou ni recouvrement.
+
 ## Base de données (Supabase)
 
 L'application a besoin d'un projet Supabase. Copie `.env.example` en `.env` et
 renseigne l'URL et la clé « anon » (Settings → API), puis exécute **dans l'ordre**
-les deux fichiers de `supabase/` depuis le SQL Editor :
+les fichiers de `supabase/` depuis le SQL Editor :
 
 | Fichier | Rôle |
 | --- | --- |
-| `schema.sql` | table `user_data` — les données privées de chaque compte |
-| `social.sql` | tables `profiles` et `friendships` — la couche amis |
+| `schema.sql` | table `user_data` — les données privées de chaque compte, et la suppression de compte |
+| `social.sql` | tables `profiles` et `friendships` — la couche amis, l'unicité du pseudo |
+| `storage.sql` | bucket privé `photos` et ses règles d'accès |
 
-Les deux fichiers sont ré-exécutables : les relancer ne casse ni ne duplique rien.
+L'ordre compte : `storage.sql` s'appuie sur `sont_amis`, définie par `social.sql`.
+Les trois fichiers sont ré-exécutables : les relancer ne casse ni ne duplique rien.
+
+Pense aussi à déclarer les URL de retour de la réinitialisation de mot de passe
+dans Authentication → URL Configuration → Redirect URLs :
+`<ton domaine>/reset-password`, `http://localhost:8081/reset-password` et
+`looksmax://reset-password`.
 
 `user_data` n'est jamais ouverte aux autres comptes. Le social repose sur un
 instantané séparé que chacun publie dans `profiles`, dont le contenu dépend des
 réglages « Visible par mes amis » du profil, et que seuls les amis acceptés
-peuvent lire.
+peuvent lire. Les photos vivent dans un bucket privé : le client demande une
+URL signée d'une heure, et la règle d'accès n'ouvre la lecture qu'au
+propriétaire et à ses amis acceptés.
 
 La clé « anon » est publique par construction : elle est embarquée dans le
 bundle. C'est la RLS qui protège les données. La clé `service_role`, elle, ne

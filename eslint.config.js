@@ -9,4 +9,16 @@ module.exports = defineConfig([
     // y redire, et ses avertissements masquaient les vrais.
     ignores: ['dist/*', '.expo/*'],
   },
+  {
+    // Les fichiers de test tournent sous Jest, qui expose ses globales sans
+    // qu'on les importe.
+    files: ['__tests__/**/*.ts', 'jest.setup.js'],
+    languageOptions: {
+      globals: {
+        jest: 'readonly', describe: 'readonly', it: 'readonly', expect: 'readonly',
+        beforeEach: 'readonly', afterEach: 'readonly',
+        beforeAll: 'readonly', afterAll: 'readonly',
+      },
+    },
+  },
 ]);
