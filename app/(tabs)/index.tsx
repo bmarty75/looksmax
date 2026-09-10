@@ -1,5 +1,6 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useFocusEffect } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { RankSheet } from "../../components/RankSheet";
@@ -14,6 +15,7 @@ import {
   partsParCategorie, projectionRangSuivant, serieCompletion, serieScore,
 } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
+import { basculerRoutine } from "../../lib/routines";
 
 const JOURS = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
 const MOIS = ["janvier","février","mars","avril","mai","juin","juillet","août","septembre","octobre","novembre","décembre"];
@@ -78,6 +80,7 @@ export default function Biometrie() {
   const { colors } = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
+  const router = useRouter();
   const [pret, setPret]         = useState(false);
   const [habits, setHabits]     = useState<any[]>([]);
   const [checked, setChecked]   = useState<Record<string, boolean>>({});
@@ -131,6 +134,19 @@ export default function Biometrie() {
       })();
     }, []),
   );
+
+  const allerAuxRoutines = () => router.push("/habits");
+
+  /**
+   * Coche depuis le tableau de bord. Le compteur des 7 jours est ajusté ici
+   * aussi : sans ça, les anneaux ne bougeraient qu'au prochain passage.
+   */
+  const cocher = async (id: string) => {
+    const r = await basculerRoutine(todayKey(), habits, checked, id);
+    setChecked(r.checked);
+    setHistory(r.history);
+    setCounts7j(c => ({ ...c, [id]: Math.max(0, (c[id] || 0) + (r.checked[id] ? 1 : -1)) }));
+  };
 
   if (!pret) {
     return (
@@ -256,7 +272,11 @@ export default function Biometrie() {
 
       {/* Ce qu'il reste à faire aujourd'hui */}
       <Card>
-        <View style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}>
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={allerAuxRoutines}
+          style={{ flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" }}
+        >
           <View style={{ flex: 1, paddingRight: 10 }}>
             <Text style={styles.protoTitre}>Protocole du jour</Text>
             <Text style={styles.protoSous}>ROUTINES NON COMPLÉTÉES</Text>
@@ -264,38 +284,53 @@ export default function Biometrie() {
           <Pill color={restantes.length === 0 ? colors.green : colors.amber} teinte={colors.surface}>
             {restantes.length === 0 ? "TERMINÉ" : `${restantes.length} RESTANTES`}
           </Pill>
-        </View>
+        </TouchableOpacity>
 
         <View style={{ marginTop: 10 }}>
+          {/* Deux zones distinctes plutôt qu'un bouton dans un bouton : le
+              libellé mène aux routines, le rond coche sur place. */}
           {restantes.slice(0, 3).map(h => (
             <View key={h.id} style={styles.ligne}>
-              <View style={[styles.ligneIcone, { backgroundColor: `${h.color}1F` }]}>
-                <Text style={{ fontSize: 17 }}>{h.icon}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.ligneNom}>{h.label}</Text>
-                <Text style={styles.ligneSous}>{(h.category ?? "").toUpperCase()}</Text>
-              </View>
-              <View style={[styles.coche, { borderColor: colors.border2 }]} />
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={allerAuxRoutines}
+                style={{ flex: 1, flexDirection: "row", alignItems: "center", gap: 12 }}
+              >
+                <View style={[styles.ligneIcone, { backgroundColor: `${h.color}1F` }]}>
+                  <Text style={{ fontSize: 17 }}>{h.icon}</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.ligneNom}>{h.label}</Text>
+                  <Text style={styles.ligneSous}>{(h.category ?? "").toUpperCase()}</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity
+                accessibilityRole="checkbox"
+                accessibilityState={{ checked: false }}
+                accessibilityLabel={`Cocher ${h.label}`}
+                onPress={() => cocher(h.id)}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                style={[styles.coche, { borderColor: h.color }]}
+              />
             </View>
           ))}
           {restantes.length === 0 && (
-            <View style={styles.ligne}>
+            <TouchableOpacity style={styles.ligne} activeOpacity={0.7} onPress={allerAuxRoutines}>
               <View style={[styles.ligneIcone, { backgroundColor: `${colors.green}1F` }]}>
                 <MaterialIcons name="check" size={19} color={colors.green} />
               </View>
               <Text style={[styles.ligneNom, { flex: 1 }]}>Journée complète</Text>
-            </View>
+            </TouchableOpacity>
           )}
         </View>
 
-        <View style={{ marginTop: 10 }}>
+        <TouchableOpacity style={{ marginTop: 10 }} activeOpacity={0.7} onPress={allerAuxRoutines}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 7 }}>
             <Text style={[styles.mesureNom, { color: colors.textSub }]}>PROGRESSION DU JOUR</Text>
             <Text style={[styles.mesureNom, { color: colors.text }]}>{faits}/{habits.length}</Text>
           </View>
           <ProgressBar value={pctJour} color={colors.amber} />
-        </View>
+        </TouchableOpacity>
       </Card>
 
       <View style={{ height: 22 }} />

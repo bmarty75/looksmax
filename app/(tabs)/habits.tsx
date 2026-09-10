@@ -13,6 +13,7 @@ import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, SEXE_DEFAUT, Sexe, todayKey 
 import { storage } from "../../hooks/useStorage";
 import { decalerCle, jourDepuisCle } from "../../lib/dates";
 import { computeCurrentStreak, rangCourant } from "../../lib/metrics";
+import { basculerRoutine } from "../../lib/routines";
 import { loadProfile } from "../../lib/profile";
 
 const MOIS_COURTS = ["jan","fév","mar","avr","mai","jun","jul","aoû","sep","oct","nov","déc"];
@@ -121,22 +122,9 @@ export default function Routines() {
   };
 
   const basculer = async (id: string) => {
-    const suivant = { ...checked, [id]: !checked[id] };
-    setChecked(suivant);
-    await storage.set(`lm_checked_${jour}`, suivant);
-
-    const faits = Object.values(suivant).filter(Boolean).length;
-    const pct = habits.length > 0 ? Math.round((faits / habits.length) * 100) : 0;
-    const hist = await storage.get("lm_history", {});
-    const maj = { ...hist, [jour]: pct };
-    await storage.set("lm_history", maj);
-    setHistory(maj);
-
-    if (id === "water") {
-      const s = await storage.get("lm_stats", { waterCount: 0 });
-      const delta = suivant[id] ? 1 : -1;
-      await storage.set("lm_stats", { ...s, waterCount: Math.max(0, (s.waterCount || 0) + delta) });
-    }
+    const r = await basculerRoutine(jour, habits, checked, id);
+    setChecked(r.checked);
+    setHistory(r.history);
   };
 
   const reinitForm = () => {
