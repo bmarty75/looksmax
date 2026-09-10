@@ -5,6 +5,7 @@ import {
 } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
+import { SEXE_DEFAUT, Sexe } from "../constants/data";
 import { Disponibilite, PSEUDO_MAX, pseudoDisponible, verifierPseudo } from "../lib/profile";
 import { isSupabaseConfigured } from "../lib/supabase";
 
@@ -28,6 +29,10 @@ function makeStyles(c: ThemeColors) {
     msgError:    { color: c.coral },
     msgOk:       { color: c.green },
     aide:        { fontSize: 11, marginTop: -10, marginBottom: 16, lineHeight: 16, fontWeight: "600" },
+    sexeRow:     { flexDirection: "row", gap: 10, marginBottom: 8 },
+    sexeBtn:     { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: c.border2, backgroundColor: c.input },
+    sexeBtnOn:   { borderColor: `${c.amber}66`, backgroundColor: `${c.amber}14` },
+    sexeTxt:     { fontSize: 14, fontWeight: "700", color: c.textSub },
     aideNeutre:  { color: c.textMuted },
     notice:      { backgroundColor: c.card, borderWidth: 1, borderColor: `${c.amber}44`, borderLeftWidth: 3, borderLeftColor: c.amber, borderRadius: 12, padding: 16, gap: 8 },
     noticeTitle: { fontSize: 13, fontWeight: "800", color: c.text },
@@ -45,6 +50,7 @@ export default function Login() {
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
   const [pseudo, setPseudo]     = useState("");
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [dispo, setDispo]       = useState<Disponibilite | null>(null);
   const [notice, setNotice]     = useState<{ text: string; ok: boolean } | null>(null);
   const [busy, setBusy]         = useState(false);
@@ -96,7 +102,7 @@ export default function Login() {
     setNotice(null);
     const result = mode === "signin"
       ? await signIn(email, password)
-      : await signUp(email, password, pseudo);
+      : await signUp(email, password, pseudo, sexe);
     setBusy(false);
     if (result.message) setNotice({ text: result.message, ok: result.ok });
     // Compte créé mais e-mail à confirmer : on ramène sur la connexion,
@@ -178,6 +184,27 @@ export default function Login() {
               maxLength={PSEUDO_MAX}
             />
             <Text style={[styles.aide, aidePseudo().style]}>{aidePseudo().texte}</Text>
+
+            <Text style={styles.label}>SEXE</Text>
+            <View style={styles.sexeRow}>
+              {(["homme", "femme"] as const).map(v => {
+                const actif = sexe === v;
+                return (
+                  <TouchableOpacity
+                    key={v}
+                    style={[styles.sexeBtn, actif && styles.sexeBtnOn]}
+                    onPress={() => setSexe(v)}
+                  >
+                    <Text style={[styles.sexeTxt, actif && { color: colors.amber }]}>
+                      {v === "homme" ? "Homme" : "Femme"}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <Text style={[styles.aide, styles.aideNeutre]}>
+              Détermine les noms des paliers. Modifiable ensuite depuis ton profil.
+            </Text>
           </>
         )}
 

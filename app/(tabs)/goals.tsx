@@ -6,7 +6,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { AreaChart, BigButton, Card, MiniRing, Pill, ProgressBar, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { COLORS, ICONS } from "../../constants/data";
+import { COLORS, ICONS, SEXE_DEFAUT, Sexe } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { cleJour } from "../../lib/dates";
 import { rangCourant, serieScore } from "../../lib/metrics";
@@ -73,6 +73,7 @@ export default function Objectifs() {
   const [goals, setGoals]           = useState<any[]>([]);
   const [history, setHistory]       = useState<Record<string, number>>({});
   const [avatar, setAvatar]         = useState<string | null>(null);
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [showForm, setShowForm]     = useState(false);
   const [form, setForm]             = useState({ label: "", target: "30", unit: "j", icon: "🎯", color: COLORS[5] });
   const [aSupprimer, setASupprimer] = useState<{ id: string; label: string } | null>(null);
@@ -82,7 +83,7 @@ export default function Objectifs() {
       // Aucun objectif d'exemple : chacun crée les siens.
       storage.get("lm_goals", []).then(g => setGoals(Array.isArray(g) ? g : []));
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
-      loadProfile().then(p => setAvatar(p.avatar));
+      loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
     }, []),
   );
 
@@ -131,7 +132,7 @@ export default function Objectifs() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <ScreenHeader section="Objectifs" avatar={avatar} rang={rangCourant(history)} />
+      <ScreenHeader section="Objectifs" avatar={avatar} rang={rangCourant(history)} sexe={sexe} />
 
       <Text style={styles.intro}>PERFORMANCE ENGINE</Text>
       <View style={styles.introRow}>

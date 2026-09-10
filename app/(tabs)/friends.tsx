@@ -6,6 +6,7 @@ import { Image, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View 
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { Card, Pill, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
+import { SEXE_DEFAUT, Sexe } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { rangCourant } from "../../lib/metrics";
 import { initiales, loadProfile } from "../../lib/profile";
@@ -46,6 +47,7 @@ export default function Amis() {
 
   const [history, setHistory]   = useState<Record<string, number>>({});
   const [avatar, setAvatar]     = useState<string | null>(null);
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [reseau, setReseau]     = useState<Reseau>({ amis: [], recuesEnAttente: [], envoyeesEnAttente: [] });
   const [recherche, setRecherche] = useState("");
   const [resultats, setResultats] = useState<{ user_id: string; pseudo: string; avatar: string | null }[]>([]);
@@ -58,7 +60,7 @@ export default function Amis() {
   useFocusEffect(
     useCallback(() => {
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
-      loadProfile().then(p => setAvatar(p.avatar));
+      loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
       // On republie à l'ouverture : les amis voient des chiffres à jour.
       publierProfil();
       rafraichir();
@@ -102,7 +104,7 @@ export default function Amis() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <ScreenHeader section="Amis" avatar={avatar} rang={rangCourant(history)} />
+      <ScreenHeader section="Amis" avatar={avatar} rang={rangCourant(history)} sexe={sexe} />
 
       <View style={styles.recherche}>
         <MaterialIcons name="search" size={20} color={colors.textMuted} />

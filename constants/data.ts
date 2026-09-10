@@ -14,19 +14,45 @@ export const DEFAULT_HABITS = [
   // Pas d'objectifs par défaut : un nouveau compte démarre avec une liste
   // vide et crée les siens depuis l'écran Objectifs.
 
+  export type Sexe = "homme" | "femme";
+  export const SEXE_DEFAUT: Sexe = "homme";
+
   // Échelle PSL (1–10). `min`/`max` = plage du score de régularité (0–100),
   // `streakReq` = streak minimum exigé en plus du score pour débloquer le palier.
+  //
+  // `label` est l'identité du palier : c'est lui qui sert aux comparaisons
+  // internes et il ne change jamais. `feminin` ne porte que l'affichage.
+  // Sub-3 et Sub-5 n'en ont pas : ce sont des notes PSL, pas des noms genrés.
   export const RANKS = [
     { min: 0,   max: 15,  label: "Sub-3",     psl: "< 3",   pop: "~5%",           color: "#5A5A5A", desc: "Traits structurels très défavorables",        streakReq: 0   },
     { min: 15,  max: 30,  label: "Sub-5",     psl: "3–4.5", pop: "~20%",          color: "#8A8A8A", desc: "Nettement sous la moyenne, défauts visibles", streakReq: 0   },
-    { min: 30,  max: 45,  label: "LTN",       psl: "4.5–5", pop: "~25%",          color: "#7B9EE0", desc: "Low Tier Normie, un peu sous la moyenne",     streakReq: 0   },
-    { min: 45,  max: 60,  label: "MTN",       psl: "5–5.5", pop: "~30%",          color: "#5AC4D4", desc: "Mid Tier Normie, la vraie moyenne",           streakReq: 0   },
-    { min: 60,  max: 72,  label: "HTN",       psl: "6–6.5", pop: "~15%",          color: "#7ECC8A", desc: "Au-dessus de la moyenne, bonne harmonie",     streakReq: 0   },
-    { min: 72,  max: 84,  label: "Chadlite",  psl: "7–7.5", pop: "top 5%",        color: "#C9A96E", desc: "Clairement attirant",                         streakReq: 21  },
-    { min: 84,  max: 92,  label: "Chad",      psl: "8–9",   pop: "top 1%",        color: "#E07B5A", desc: "Dominance sociale + physique",                streakReq: 45  },
-    { min: 92,  max: 100, label: "Gigachad",  psl: "9–9.5", pop: "top 0.1%",      color: "#F0D090", desc: "Outlier",                                     streakReq: 60  },
-    { min: 100, max: 101, label: "True Adam", psl: "10",    pop: "1/10 milliards", color: "#B07ECC", desc: "Purement théorique",                         streakReq: 365 },
+    { min: 30,  max: 45,  label: "LTN",       psl: "4.5–5", pop: "~25%",          color: "#7B9EE0", desc: "Low Tier Normie, un peu sous la moyenne",     streakReq: 0,
+      feminin: { label: "LTB",       desc: "Low Tier Becky, un peu sous la moyenne" } },
+    { min: 45,  max: 60,  label: "MTN",       psl: "5–5.5", pop: "~30%",          color: "#5AC4D4", desc: "Mid Tier Normie, la vraie moyenne",           streakReq: 0,
+      feminin: { label: "MTB",       desc: "Mid Tier Becky, la vraie moyenne" } },
+    { min: 60,  max: 72,  label: "HTN",       psl: "6–6.5", pop: "~15%",          color: "#7ECC8A", desc: "Au-dessus de la moyenne, bonne harmonie",     streakReq: 0,
+      feminin: { label: "HTB",       desc: "High Tier Becky, au-dessus de la moyenne" } },
+    { min: 72,  max: 84,  label: "Chadlite",  psl: "7–7.5", pop: "top 5%",        color: "#C9A96E", desc: "Clairement attirant",                         streakReq: 21,
+      feminin: { label: "Stacylite", desc: "Clairement attirante" } },
+    { min: 84,  max: 92,  label: "Chad",      psl: "8–9",   pop: "top 1%",        color: "#E07B5A", desc: "Dominance sociale + physique",                streakReq: 45,
+      feminin: { label: "Stacy",     desc: "Dominance sociale + physique" } },
+    { min: 92,  max: 100, label: "Gigachad",  psl: "9–9.5", pop: "top 0.1%",      color: "#F0D090", desc: "Outlier",                                     streakReq: 60,
+      feminin: { label: "Gigastacy", desc: "Outlier" } },
+    { min: 100, max: 101, label: "True Adam", psl: "10",    pop: "1/10 milliards", color: "#B07ECC", desc: "Purement théorique",                         streakReq: 365,
+      feminin: { label: "True Eve",  desc: "Purement théorique" } },
   ];
+
+  export type Rang = (typeof RANKS)[number];
+
+  /**
+   * Nom affiché d'un palier. Les seuils, eux, sont identiques pour tout le
+   * monde : le score mesure de la régularité, pas une morphologie.
+   */
+  export const libelleRang = (r: Rang, sexe: Sexe = SEXE_DEFAUT) =>
+    (sexe === "femme" ? r.feminin?.label ?? r.label : r.label);
+
+  export const descriptionRang = (r: Rang, sexe: Sexe = SEXE_DEFAUT) =>
+    (sexe === "femme" ? r.feminin?.desc ?? r.desc : r.desc);
   
   export const BADGES = [
     { id: "first_day",    icon: "🌱", label: "1ère routine",  desc: "Complète 1 habitude",      condition: (s: any) => s.totalChecked >= 1 },

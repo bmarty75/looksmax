@@ -7,6 +7,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { BigButton, Card, Pill, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
+import { SEXE_DEFAUT, Sexe } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { rangCourant } from "../../lib/metrics";
 import { Photo, PhotoPick, choisirPhoto, ecartEnJours, grouperParMois, prendrePhoto } from "../../lib/photos";
@@ -58,6 +59,7 @@ export default function Progression() {
   const [photos, setPhotos]     = useState<Photo[]>([]);
   const [history, setHistory]   = useState<Record<string, number>>({});
   const [avatar, setAvatar]     = useState<string | null>(null);
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [choisie, setChoisie]   = useState<Photo | null>(null);
   const [confirme, setConfirme] = useState(false);
   const [erreur, setErreur]     = useState<string | null>(null);
@@ -78,7 +80,7 @@ export default function Progression() {
         }
       });
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
-      loadProfile().then(p => setAvatar(p.avatar));
+      loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
     }, []),
   );
 
@@ -115,7 +117,7 @@ export default function Progression() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <ScreenHeader section="Progression" avatar={avatar} rang={rangCourant(history)} />
+      <ScreenHeader section="Progression" avatar={avatar} rang={rangCourant(history)} sexe={sexe} />
 
       {/* Résumé du suivi */}
       <Card style={{ marginBottom: 18 }}>

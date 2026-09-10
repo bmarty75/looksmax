@@ -9,7 +9,7 @@ import { ConfirmDialog } from "../../components/ConfirmDialog";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { BigButton, Card, Pill, SegmentBar } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, todayKey } from "../../constants/data";
+import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, SEXE_DEFAUT, Sexe, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { decalerCle, jourDepuisCle } from "../../lib/dates";
 import { computeCurrentStreak, rangCourant } from "../../lib/metrics";
@@ -86,6 +86,7 @@ export default function Routines() {
   const [checked, setChecked]       = useState<Record<string, boolean>>({});
   const [history, setHistory]       = useState<Record<string, number>>({});
   const [avatar, setAvatar]         = useState<string | null>(null);
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [jour, setJour]             = useState(todayKey());
   const [filtre, setFiltre]         = useState<string>("tous");
   const [showForm, setShowForm]     = useState(false);
@@ -106,7 +107,7 @@ export default function Routines() {
     useCallback(() => {
       storage.get("lm_habits", DEFAULT_HABITS).then(h => setHabits(Array.isArray(h) ? h : DEFAULT_HABITS));
       storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
-      loadProfile().then(p => setAvatar(p.avatar));
+      loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
     }, []),
   );
 
@@ -179,7 +180,7 @@ export default function Routines() {
 
   return (
     <ScrollView ref={scrollRef} style={styles.root} contentContainerStyle={styles.content}>
-      <ScreenHeader section="Routines" avatar={avatar} rang={rangCourant(history)} />
+      <ScreenHeader section="Routines" avatar={avatar} rang={rangCourant(history)} sexe={sexe} />
 
       {/* Statut du jour */}
       <Card>

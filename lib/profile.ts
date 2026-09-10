@@ -1,6 +1,7 @@
 import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
 import * as ImagePicker from "expo-image-picker";
 import { storage } from "../hooks/useStorage";
+import { SEXE_DEFAUT, Sexe } from "../constants/data";
 import { isSupabaseConfigured, supabase } from "./supabase";
 
 export interface Profile {
@@ -8,10 +9,12 @@ export interface Profile {
   bio: string;
   /** Image encodée en data URI, ou null. */
   avatar: string | null;
+  /** Détermine les noms de paliers affichés, pas les seuils. */
+  sexe: Sexe;
 }
 
 export const PROFILE_KEY = "lm_profile";
-export const EMPTY_PROFILE: Profile = { pseudo: "", bio: "", avatar: null };
+export const EMPTY_PROFILE: Profile = { pseudo: "", bio: "", avatar: null, sexe: SEXE_DEFAUT };
 
 export const PSEUDO_MIN = 3;
 export const PSEUDO_MAX = 20;
@@ -81,6 +84,8 @@ export async function loadProfile(): Promise<Profile> {
     pseudo: typeof p.pseudo === "string" ? p.pseudo : "",
     bio: typeof p.bio === "string" ? p.bio : "",
     avatar: typeof p.avatar === "string" ? p.avatar : null,
+    // Les comptes créés avant ce champ gardent l'échelle qu'ils voyaient déjà.
+    sexe: p.sexe === "femme" ? "femme" : SEXE_DEFAUT,
   };
 }
 

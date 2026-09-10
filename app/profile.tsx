@@ -6,6 +6,7 @@ import {
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { RANKS, libelleRang } from "../constants/data";
 import { Partage, chargerPartage, enregistrerPartage, publierProfil } from "../lib/social";
 import { useAuth } from "../contexts/AuthContext";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
@@ -53,6 +54,11 @@ function makeStyles(c: ThemeColors) {
     msgOk:         { color: c.green },
     msgError:      { color: c.coral },
     separator:     { height: 1, backgroundColor: c.border, marginBottom: 24 },
+    sexeRow:       { flexDirection: "row", gap: 10, marginBottom: 8 },
+    sexeBtn:       { flex: 1, alignItems: "center", paddingVertical: 13, borderRadius: 10, borderWidth: 1, borderColor: c.border2, backgroundColor: c.card },
+    sexeBtnOn:     { borderColor: `${c.amber}66`, backgroundColor: `${c.amber}14` },
+    sexeTxt:       { fontSize: 14, fontWeight: "700", color: c.textSub },
+    sexeNote:      { fontSize: 11, color: c.textMuted, lineHeight: 16, marginBottom: 16 },
     zoneTitre:     { fontSize: 10, letterSpacing: 3, color: c.coral, fontWeight: "700", marginBottom: 10 },
     zoneTexte:     { fontSize: 12, color: c.textMuted, lineHeight: 18, marginBottom: 14 },
     supprimerBtn:  { borderWidth: 1, borderColor: `${c.coral}55`, borderRadius: 12, padding: 15, alignItems: "center", marginTop: 4 },
@@ -118,7 +124,8 @@ export default function ProfileScreen() {
   const modifie =
     profile.pseudo !== initial.pseudo ||
     profile.bio !== initial.bio ||
-    profile.avatar !== initial.avatar;
+    profile.avatar !== initial.avatar ||
+    profile.sexe !== initial.sexe;
 
   const changerAvatar = async () => {
     setAvatarOccupe(true);
@@ -135,6 +142,7 @@ export default function ProfileScreen() {
       pseudo: profile.pseudo.trim().slice(0, PSEUDO_MAX),
       bio: profile.bio.trim().slice(0, BIO_MAX),
       avatar: profile.avatar,
+      sexe: profile.sexe,
     };
 
     const refus = verifierPseudo(nettoye.pseudo);
@@ -288,6 +296,29 @@ export default function ProfileScreen() {
             onChangeText={t => setProfile(p => ({ ...p, bio: t }))}
             multiline
           />
+
+          <Text style={styles.label}>SEXE</Text>
+          <View style={styles.sexeRow}>
+            {(["homme", "femme"] as const).map(v => {
+              const actif = profile.sexe === v;
+              return (
+                <TouchableOpacity
+                  key={v}
+                  style={[styles.sexeBtn, actif && styles.sexeBtnOn]}
+                  onPress={() => setProfile(p => ({ ...p, sexe: v }))}
+                >
+                  <Text style={[styles.sexeTxt, actif && { color: colors.amber }]}>
+                    {v === "homme" ? "Homme" : "Femme"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <Text style={styles.sexeNote}>
+            Change les noms des paliers ({libelleRang(RANKS[6], profile.sexe)},
+            {" "}{libelleRang(RANKS[8], profile.sexe)}…). Les seuils, eux, sont les mêmes
+            pour tout le monde.
+          </Text>
 
           <Text style={styles.label}>E-MAIL</Text>
           <View style={styles.readonly}>

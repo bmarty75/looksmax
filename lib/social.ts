@@ -1,7 +1,7 @@
 import { storage } from "../hooks/useStorage";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
-import { DEFAULT_HABITS, getRank, todayKey } from "../constants/data";
+import { DEFAULT_HABITS, getRank, libelleRang, todayKey } from "../constants/data";
 import { cleJour } from "./dates";
 import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
@@ -99,7 +99,9 @@ async function construireInstantane(): Promise<Omit<ProfilPublic, "user_id">> {
     stats = {
       psl: indexPsl(score, streak),
       score,
-      rang: rang.label,
+      // Le libellé, pas l'identité du palier : l'ami affiche tel quel, il
+      // n'a pas à connaître le sexe de la personne pour le traduire.
+      rang: libelleRang(rang, profil.sexe),
       couleurRang: rang.color,
       streak,
       joursActifs: Object.values(history).filter(v => v > 0).length,

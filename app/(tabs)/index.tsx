@@ -6,7 +6,7 @@ import { RankSheet } from "../../components/RankSheet";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { AreaChart, Card, Pill, ProgressBar, Rings, SectionTitle, Sparkline } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
-import { DEFAULT_HABITS, getRank, todayKey } from "../../constants/data";
+import { DEFAULT_HABITS, SEXE_DEFAUT, Sexe, getRank, libelleRang, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
 import { cleJour } from "../../lib/dates";
 import {
@@ -84,6 +84,7 @@ export default function Biometrie() {
   const [history, setHistory]   = useState<Record<string, number>>({});
   const [counts7j, setCounts7j] = useState<Record<string, number>>({});
   const [avatar, setAvatar]     = useState<string | null>(null);
+  const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [echelleOuverte, setEchelleOuverte] = useState(false);
 
   useFocusEffect(
@@ -121,7 +122,9 @@ export default function Biometrie() {
           setChecked(checkedObj);
           setHistory(historyObj);
           setCounts7j(counts);
-          setAvatar((await loadProfile()).avatar);
+          const profil = await loadProfile();
+          setAvatar(profil.avatar);
+          setSexe(profil.sexe);
         } finally {
           setPret(true);
         }
@@ -164,7 +167,7 @@ export default function Biometrie() {
 
   return (
     <ScrollView style={styles.root} contentContainerStyle={styles.content}>
-      <ScreenHeader section="Biométrie" avatar={avatar} rang={rang} />
+      <ScreenHeader section="Biométrie" avatar={avatar} rang={rang} sexe={sexe} />
 
       <View style={styles.dateRow}>
         <View style={styles.dateGauche}>
@@ -203,7 +206,7 @@ export default function Biometrie() {
                 <Text style={styles.pslValeur}>{psl.toFixed(1)}</Text>
                 <Text style={styles.pslLabel}>PSL INDEX</Text>
                 <Pill color={rang.color} teinte={`${rang.color}22`} dot style={{ marginTop: 8 }}>
-                  {rang.label.toUpperCase()}
+                  {libelleRang(rang, sexe).toUpperCase()}
                 </Pill>
               </>
             }
@@ -320,7 +323,7 @@ export default function Biometrie() {
           <MaterialIcons name="military-tech" size={22} color={colors.amber} />
           <View style={{ flex: 1 }}>
             <Text style={styles.encartNom}>
-              {projection.rang ? `Prochain rang : ${projection.rang.label}` : "Rang maximal atteint"}
+              {projection.rang ? `Prochain rang : ${libelleRang(projection.rang, sexe)}` : "Rang maximal atteint"}
             </Text>
             <Text style={styles.encartSous}>
               {projection.rang == null
@@ -339,7 +342,7 @@ export default function Biometrie() {
       <RankSheet
         visible={echelleOuverte}
         onClose={() => setEchelleOuverte(false)}
-        rangActuel={rang.label}
+        rangActuel={rang.label} sexe={sexe}
       />
     </ScrollView>
   );

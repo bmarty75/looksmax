@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Session } from "@supabase/supabase-js";
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import { adoptLegacyData, effacerDonneesLocales, pullFromCloud, pushAllToCloud, setActiveUser } from "../hooks/useStorage";
+import { Sexe } from "../constants/data";
 import { EMPTY_PROFILE, reserverPseudo, saveProfile } from "../lib/profile";
 import { viderMonDossier } from "../lib/stockagePhotos";
 import { isSupabaseConfigured, SESSION_STORAGE_KEY, supabase, urlRetourRecuperation } from "../lib/supabase";
@@ -40,7 +41,7 @@ interface AuthCtx {
   /** true pendant la récupération des données du compte, juste après connexion. */
   syncing: boolean;
   signIn: (email: string, password: string) => Promise<AuthResult>;
-  signUp: (email: string, password: string, pseudo: string) => Promise<AuthResult>;
+  signUp: (email: string, password: string, pseudo: string, sexe: Sexe) => Promise<AuthResult>;
   signOut: () => Promise<void>;
   changePassword: (current: string, next: string) => Promise<AuthResult>;
   /** Envoie l'e-mail contenant le lien de réinitialisation. */
@@ -176,7 +177,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, pseudo: string): Promise<AuthResult> => {
+  const signUp = async (email: string, password: string, pseudo: string, sexe: Sexe): Promise<AuthResult> => {
     const nom = pseudo.trim();
     try {
       const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
@@ -197,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const uid = data.session.user.id;
       setActiveUser(uid);
       seenUsers.current.add(uid);            // pas d'écran de synchro : rien à récupérer
-      await saveProfile({ ...EMPTY_PROFILE, pseudo: nom });
+      await saveProfile({ ...EMPTY_PROFILE, pseudo: nom, sexe });
       await reserverPseudo(uid, nom);
       await pushAllToCloud();
 

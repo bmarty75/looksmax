@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { RANKS } from "../constants/data";
+import { RANKS, SEXE_DEFAUT, Sexe, descriptionRang, libelleRang } from "../constants/data";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
 
 function makeStyles(c: ThemeColors) {
@@ -28,8 +28,8 @@ function makeStyles(c: ThemeColors) {
 
 /** Tableau complet de l'échelle PSL, ouvert depuis la pastille de rang. */
 export function RankSheet({
-  visible, onClose, rangActuel,
-}: { visible: boolean; onClose: () => void; rangActuel?: string }) {
+  visible, onClose, rangActuel, sexe = SEXE_DEFAUT,
+}: { visible: boolean; onClose: () => void; rangActuel?: string; sexe?: Sexe }) {
   const { colors } = useTheme();
   const styles = makeStyles(colors);
   const liste = useRef<ScrollView>(null);
@@ -67,12 +67,12 @@ export function RankSheet({
                   <View style={[styles.pastille, { backgroundColor: r.color }]} />
                   <View style={{ flex: 1 }}>
                     <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={[styles.nom, { color: r.color }]}>{r.label}</Text>
+                      <Text style={[styles.nom, { color: r.color }]}>{libelleRang(r, sexe)}</Text>
                       {actuel && (
                         <Text style={[styles.toi, { backgroundColor: r.color }]}>TOI</Text>
                       )}
                     </View>
-                    <Text style={styles.desc}>{r.desc}</Text>
+                    <Text style={styles.desc}>{descriptionRang(r, sexe)}</Text>
                     <Text style={styles.exigences}>
                       SCORE {r.min === maxAffiche ? r.min : `${r.min}–${maxAffiche}`}
                       {r.streakReq > 0 ? ` · STREAK ${r.streakReq}J` : ""}

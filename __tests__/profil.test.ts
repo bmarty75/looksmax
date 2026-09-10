@@ -3,6 +3,61 @@ import {
   estPseudoDejaPris, initiales, verifierPseudo,
 } from "../lib/profile";
 import { PARTAGE_DEFAUT } from "../lib/social";
+import { RANKS, SEXE_DEFAUT, descriptionRang, libelleRang } from "../constants/data";
+
+describe("échelle selon le sexe", () => {
+  const parLabel = (l: string) => RANKS.find(r => r.label === l)!;
+
+  it("garde les noms masculins par défaut", () => {
+    expect(SEXE_DEFAUT).toBe("homme");
+    expect(libelleRang(parLabel("Chad"))).toBe("Chad");
+    expect(libelleRang(parLabel("True Adam"), "homme")).toBe("True Adam");
+  });
+
+  it("rend les huit équivalents féminins", () => {
+    const attendu: Record<string, string> = {
+      "LTN": "LTB", "MTN": "MTB", "HTN": "HTB", "Chadlite": "Stacylite",
+      "Chad": "Stacy", "Gigachad": "Gigastacy", "True Adam": "True Eve",
+    };
+    for (const [masculin, feminin] of Object.entries(attendu)) {
+      expect(libelleRang(parLabel(masculin), "femme")).toBe(feminin);
+    }
+    // Sub-5 est une note PSL, pas un nom genré : il ne change pas.
+    expect(libelleRang(parLabel("Sub-5"), "femme")).toBe("Sub-5");
+    expect(libelleRang(parLabel("Sub-3"), "femme")).toBe("Sub-3");
+  });
+
+  it("donne un nom à chaque palier, quel que soit le sexe", () => {
+    for (const sexe of ["homme", "femme"] as const) {
+      for (const r of RANKS) {
+        expect(libelleRang(r, sexe)).toBeTruthy();
+        expect(descriptionRang(r, sexe)).toBeTruthy();
+      }
+    }
+  });
+
+  it("ne double aucun nom à l'intérieur d'une échelle", () => {
+    for (const sexe of ["homme", "femme"] as const) {
+      const noms = RANKS.map(r => libelleRang(r, sexe));
+      expect(new Set(noms).size).toBe(RANKS.length);
+    }
+  });
+
+  it("ne touche ni aux seuils ni aux couleurs", () => {
+    // Le score mesure la régularité : le sexe ne doit rien y changer.
+    for (const r of RANKS) {
+      expect(r).toHaveProperty("min");
+      expect(r).toHaveProperty("streakReq");
+    }
+    expect(RANKS.map(r => r.min)).toEqual([0, 15, 30, 45, 60, 72, 84, 92, 100]);
+    expect(RANKS.map(r => r.streakReq)).toEqual([0, 0, 0, 0, 0, 21, 45, 60, 365]);
+  });
+
+  it("adapte aussi la description quand elle nomme le palier", () => {
+    expect(descriptionRang(parLabel("LTN"), "femme")).toContain("Becky");
+    expect(descriptionRang(parLabel("LTN"), "homme")).toContain("Normie");
+  });
+});
 
 describe("verifierPseudo", () => {
   it("accepte ce que la contrainte SQL accepte", () => {
@@ -93,7 +148,7 @@ describe("réglages de partage", () => {
 
 describe("profil vide", () => {
   it("ne contient rien qui puisse être publié par erreur", () => {
-    expect(EMPTY_PROFILE).toEqual({ pseudo: "", bio: "", avatar: null });
+    expect(EMPTY_PROFILE).toEqual({ pseudo: "", bio: "", avatar: null, sexe: SEXE_DEFAUT });
   });
 
   it("garde des limites cohérentes avec les champs de saisie", () => {

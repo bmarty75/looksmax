@@ -2,6 +2,7 @@ import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, useWindowDimensions, View } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import { Rang, SEXE_DEFAUT, Sexe, libelleRang } from "../constants/data";
 import { useTheme } from "../contexts/ThemeContext";
 import { Logo } from "./brand/Logo";
 import { RankSheet } from "./RankSheet";
@@ -18,12 +19,14 @@ const LARGEUR_MIN_MARQUE = 385;
  * rang looksmaxing et accès au profil à droite.
  */
 export function ScreenHeader({
-  section, avatar, rang,
+  section, avatar, rang, sexe = SEXE_DEFAUT,
 }: {
   section: string;
   avatar?: string | null;
   /** Rang PSL courant, affiché en pastille à sa couleur. */
-  rang?: { label: string; color: string };
+  rang?: Rang;
+  /** Détermine le nom affiché du palier, pas le palier lui-même. */
+  sexe?: Sexe;
 }) {
   const { colors } = useTheme();
   const router = useRouter();
@@ -62,7 +65,7 @@ export function ScreenHeader({
           >
             <View style={[s.point, { backgroundColor: rang.color }]} />
             <Text style={[s.pastilleTxt, { color: rang.color }]} numberOfLines={1}>
-              {rang.label.toUpperCase()}
+              {libelleRang(rang, sexe).toUpperCase()}
             </Text>
           </TouchableOpacity>
         )}
@@ -79,7 +82,7 @@ export function ScreenHeader({
       <RankSheet
         visible={echelleOuverte}
         onClose={() => setEchelleOuverte(false)}
-        rangActuel={rang?.label}
+        rangActuel={rang?.label} sexe={sexe}
       />
     </View>
   );
