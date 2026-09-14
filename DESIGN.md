@@ -1,4 +1,4 @@
-# LOOKSMAX OS — dossier de conception
+# DAILYMAXING — dossier de conception
 
 Document de référence à donner à un outil de maquettage IA. Il décrit l'app
 telle qu'elle existe réellement dans le code, après la refonte visuelle.
@@ -76,7 +76,7 @@ Police système, aucune police personnalisée.
 
 | Usage | Taille | Graisse | Interlettrage |
 |---|---|---|---|
-| Marque « LOOKSMAX » | 15 | 800 | 0.6 |
+| Marque « DAILYMAXING » | 15 | 800 | 0.6 |
 | Nom de section sous la marque | 9 | 700 | 2 |
 | Grand titre d'écran | 26 | 800 | 0 |
 | Titre de section | 11 | 700 | 1.6 |
@@ -108,11 +108,11 @@ supérieur. Icônes Material en trait, 22 px, libellé 10 px.
 | Objectifs | `track-changes` | Objectifs |
 | Progression | `insights` | Photos |
 
-**En-tête commun aux 4 onglets** : logo 30 px + « LOOKSMAX » / nom de section à
+**En-tête commun aux 4 onglets** : logo 30 px + « DAILYMAXING » / nom de section à
 gauche ; à droite une **pastille du rang PSL** à sa couleur (cliquable, elle
 ouvre l'échelle complète) et un rond crème de 34 px qui ouvre le profil (photo de
 profil si elle existe, sinon une silhouette). Sous 385 px de large, le mot
-« LOOKSMAX » disparaît au profit du seul nom de section, pour ne pas le tronquer.
+« DAILYMAXING » disparaît au profit du seul nom de section, pour ne pas le tronquer.
 
 **Écrans hors onglets** (pile, flèche retour) : Connexion, Mon profil, Comparer.
 
@@ -121,7 +121,7 @@ profil si elle existe, sinon une silhouette). Sous 385 px de large, le mot
 ## 5. Écrans
 
 ### 5.1 Connexion / Inscription
-Centré, sans onglets. Sur-titre ambre « LOOKSMAX OS », titre, sous-titre gris,
+Centré, sans onglets. Sur-titre ambre « DAILYMAXING », titre, sous-titre gris,
 champs E-MAIL / MOT DE PASSE en majuscules, bouton plein ambre à texte noir,
 lien de bascule. Messages : vert en succès, corail en erreur.
 

@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "looksmax",
-    "slug": "looksmax",
+    "name": "dailymaxing",
+    "slug": "dailymaxing",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",

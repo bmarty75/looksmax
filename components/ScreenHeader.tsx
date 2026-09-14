@@ -8,11 +8,11 @@ import { Logo } from "./brand/Logo";
 import { RankSheet } from "./RankSheet";
 
 /**
- * En dessous de cette largeur, le mot « LOOKSMAX » est retiré : le logo suffit
+ * En dessous de cette largeur, le mot « DAILYMAXING » est retiré : le logo suffit
  * à identifier l'app, et mieux vaut le masquer que le laisser tronquer quand un
  * rang au nom long occupe la droite.
  */
-const LARGEUR_MIN_MARQUE = 385;
+const LARGEUR_MIN_MARQUE = 420;
 
 /**
  * En-tête présent sur les quatre onglets : logo + nom de section à gauche,
@@ -40,7 +40,10 @@ export function ScreenHeader({
         <Logo size={30} />
         <View style={{ flexShrink: 1 }}>
           {marqueVisible && (
-            <Text style={[s.marque, { color: colors.text }]} numberOfLines={1}>LOOKSMAX</Text>
+            <Text style={s.marque} numberOfLines={1}>
+              <Text style={{ color: colors.text }}>DAILY</Text>
+              <Text style={{ color: colors.amber }}>MAXING</Text>
+            </Text>
           )}
           <Text
             style={[

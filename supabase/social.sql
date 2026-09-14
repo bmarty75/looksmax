@@ -1,5 +1,5 @@
 -- ============================================================
---  LOOKSMAX OS — couche sociale (amis)
+--  DAILYMAXING — couche sociale (amis)
 --  À coller dans : Supabase → ton projet → SQL Editor → Run
 --  (à exécuter APRÈS schema.sql)
 -- ============================================================

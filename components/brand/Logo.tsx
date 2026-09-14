@@ -2,7 +2,7 @@ import Svg, { Defs, LinearGradient, Path, Stop } from "react-native-svg";
 import { useTheme } from "../../contexts/ThemeContext";
 
 /**
- * Logo LOOKSMAX : arc ouvert dégradé orange → vert, triangle de lecture au centre.
+ * Logo DAILYMAXING : arc ouvert dégradé orange → vert, triangle de lecture au centre.
  * Pointe orange en haut (1 h), pointe verte en bas à droite (4 h) ;
  * 270° parcourus dans le sens antihoraire, ouverture à droite.
  */

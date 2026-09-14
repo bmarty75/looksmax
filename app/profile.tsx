@@ -233,7 +233,7 @@ export default function ProfileScreen() {
             <MaterialIcons name="arrow-back" size={19} color={colors.textSub} />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerSub}>LOOKSMAX OS</Text>
+            <Text style={styles.headerSub}>DAILYMAXING</Text>
             <Text style={styles.headerTitle}>Mon profil</Text>
           </View>
         </View>

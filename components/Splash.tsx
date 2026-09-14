@@ -46,10 +46,10 @@ export function Splash({ message }: { message?: string }) {
         <Logo size={64} />
       </Animated.View>
 
-      <View style={s.marqueBloc}>
-        <Text style={[s.marque, { color: colors.text }]}>LOOKSMAX</Text>
-        <Text style={[s.os, { color: colors.amber }]}>OS</Text>
-      </View>
+      <Text style={s.marque}>
+        <Text style={{ color: colors.text }}>DAILY</Text>
+        <Text style={{ color: colors.amber }}>MAXING</Text>
+      </Text>
 
       <View style={[s.piste, { backgroundColor: colors.surface }]}>
         <Animated.View
@@ -66,9 +66,7 @@ export function Splash({ message }: { message?: string }) {
 
 const s = StyleSheet.create({
   root:       { flex: 1, alignItems: "center", justifyContent: "center", gap: 18 },
-  marqueBloc: { flexDirection: "row", alignItems: "baseline", gap: 7 },
-  marque:     { fontSize: 23, fontWeight: "800", letterSpacing: 2.5 },
-  os:         { fontSize: 12, fontWeight: "800", letterSpacing: 3 },
+  marque:     { fontSize: 22, fontWeight: "800", letterSpacing: 2.2 },
   piste:      { width: 140, height: 3, borderRadius: 2, overflow: "hidden", marginTop: 6 },
   curseur:    { width: 70, height: 3, borderRadius: 2 },
   message:    { fontSize: 9.5, fontWeight: "700", letterSpacing: 2.4 },

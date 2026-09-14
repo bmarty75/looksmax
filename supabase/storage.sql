@@ -1,5 +1,5 @@
 -- ============================================================
---  LOOKSMAX OS — stockage des photos de progression
+--  DAILYMAXING — stockage des photos de progression
 --  À coller dans : Supabase → ton projet → SQL Editor → Run
 --  (à exécuter APRÈS schema.sql et social.sql)
 -- ============================================================

@@ -132,7 +132,7 @@ export default function Login() {
   if (!isSupabaseConfigured) {
     return (
       <View style={[styles.root, { justifyContent: "center", paddingHorizontal: 28 }]}>
-        <Text style={styles.brand}>LOOKSMAX OS</Text>
+        <Text style={styles.brand}>DAILYMAXING</Text>
         <Text style={styles.title}>Presque prêt</Text>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Il manque les clés Supabase</Text>
@@ -152,7 +152,7 @@ export default function Login() {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>LOOKSMAX OS</Text>
+        <Text style={styles.brand}>DAILYMAXING</Text>
         <Text style={styles.title}>
           {mode === "signin" ? "Connexion" : mode === "signup" ? "Créer un compte" : "Mot de passe oublié"}
         </Text>

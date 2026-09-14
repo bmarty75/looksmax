@@ -48,9 +48,9 @@ const STYLE = `<style id="lm-preamorce">
   }
   #preamorce.parti { opacity: 0; pointer-events: none; }
   #preamorce > svg { animation: lm-respire 2.2s ease-in-out infinite; }
-  #preamorce-marque { display: flex; align-items: baseline; gap: 7px; }
-  #preamorce-marque span { font-size: 23px; font-weight: 800; letter-spacing: 2.5px; color: var(--lm-texte, ${SOMBRE.texte}); }
-  #preamorce-marque em { font-style: normal; font-size: 12px; font-weight: 800; letter-spacing: 3px; color: var(--lm-ambre, ${SOMBRE.ambre}); }
+  #preamorce-marque { display: flex; align-items: baseline; }
+  #preamorce-marque span { font-size: 22px; font-weight: 800; letter-spacing: 2.2px; color: var(--lm-texte, ${SOMBRE.texte}); }
+  #preamorce-marque em { font-style: normal; font-size: 22px; font-weight: 800; letter-spacing: 2.2px; color: var(--lm-ambre, ${SOMBRE.ambre}); }
   #preamorce-piste { width: 140px; height: 3px; border-radius: 2px; overflow: hidden; margin-top: 6px; background-color: var(--lm-piste, ${SOMBRE.piste}); }
   #preamorce-curseur { width: 70px; height: 3px; border-radius: 2px; background-color: var(--lm-ambre, ${SOMBRE.ambre}); animation: lm-balaye 1.4s ease-in-out infinite; }
   @keyframes lm-respire { 0%,100% { transform: scale(1); opacity: .55 } 50% { transform: scale(1.06); opacity: 1 } }
@@ -74,14 +74,14 @@ const VOILE = `<div id="preamorce" aria-hidden="true">
         <path d="M 71.80 18.87 A 38 38 0 1 0 81.13 71.80" stroke="url(#lmArcHtml)" stroke-width="8" stroke-linecap="round" fill="none" />
         <path d="M 41 33 L 67 50 L 41 67 Z" fill="var(--lm-texte, ${SOMBRE.texte})" />
       </svg>
-      <div id="preamorce-marque"><span>LOOKSMAX</span><em>OS</em></div>
+      <div id="preamorce-marque"><span>DAILY</span><em>MAXING</em></div>
       <div id="preamorce-piste"><div id="preamorce-curseur"></div></div>
     </div>
     <div id="root">`;
 
 const REMPLACEMENTS = [
   ['<html lang="en">', '<html lang="fr">'],
-  ["<title>looksmax</title>", `<title>LOOKSMAX OS</title>\n    <meta name="theme-color" content="${SOMBRE.fond}" />`],
+  ["<title>dailymaxing</title>", `<title>DAILYMAXING</title>\n    <meta name="theme-color" content="${SOMBRE.fond}" />`],
   ["</head>", `${PEINDRE_TOT}\n${STYLE}\n</head>`],
   ['<div id="root">', VOILE],
 ];

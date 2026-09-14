@@ -1,5 +1,5 @@
 -- ============================================================
---  LOOKSMAX OS — schéma Supabase
+--  DAILYMAXING — schéma Supabase
 --  À coller dans : Supabase → ton projet → SQL Editor → Run
 -- ============================================================
 

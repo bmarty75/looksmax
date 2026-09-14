@@ -58,7 +58,7 @@ export default function NouveauMotDePasse() {
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : undefined}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.brand}>LOOKSMAX OS</Text>
+        <Text style={styles.brand}>DAILYMAXING</Text>
         <Text style={styles.title}>Nouveau mot de passe</Text>
         <Text style={styles.subtitle}>
           {recuperation

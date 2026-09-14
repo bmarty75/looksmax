@@ -152,7 +152,7 @@ export default function CompareScreen() {
               <MaterialIcons name="arrow-back" size={19} color={colors.textSub} />
             </TouchableOpacity>
             <View>
-              <Text style={styles.headerSub}>LOOKSMAX OS</Text>
+              <Text style={styles.headerSub}>DAILYMAXING</Text>
               <Text style={styles.headerTitle}>Comparer</Text>
             </View>
           </View>
@@ -194,7 +194,7 @@ export default function CompareScreen() {
             <MaterialIcons name="arrow-back" size={19} color={colors.textSub} />
           </TouchableOpacity>
           <View>
-            <Text style={styles.headerSub}>LOOKSMAX OS</Text>
+            <Text style={styles.headerSub}>DAILYMAXING</Text>
             <Text style={styles.headerTitle}>Comparer</Text>
           </View>
         </View>
