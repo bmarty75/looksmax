@@ -2,7 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useRouter } from "expo-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Image, LayoutChangeEvent, PanResponder, ScrollView,
+  Animated, Image, LayoutChangeEvent, PanResponder, Platform, ScrollView,
   StyleSheet, Text, TouchableOpacity, View,
 } from "react-native";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
@@ -33,11 +33,23 @@ function makeStyles(c: ThemeColors) {
     duoLabel:    { fontSize: 9, letterSpacing: 2, fontWeight: "700", marginTop: 6, textAlign: "center" },
     duoDate:     { fontSize: 11, color: c.textMuted, textAlign: "center", marginTop: 2 },
 
-    wipeWrap:    { width: "100%", aspectRatio: 0.8, borderRadius: 12, overflow: "hidden", backgroundColor: c.surface, marginBottom: 14 },
+    wipeWrap:    {
+      width: "100%", aspectRatio: 0.8, borderRadius: 12, overflow: "hidden",
+      backgroundColor: c.surface, marginBottom: 14,
+      // Sur le web, la souris doit annoncer ce que la zone sait faire.
+      ...(Platform.OS === "web" ? { cursor: "ew-resize" } as object : null),
+    },
     wipeImg:     { ...StyleSheet.absoluteFillObject, width: "100%", height: "100%" },
-    wipeClip:    { ...StyleSheet.absoluteFillObject, overflow: "hidden" },
-    wipeLine:    { position: "absolute", top: 0, bottom: 0, width: 2, backgroundColor: c.amber },
-    wipeGrip:    { position: "absolute", width: 36, height: 36, borderRadius: 18, backgroundColor: c.amber, alignItems: "center", justifyContent: "center" },
+    // Ancrées à gauche : c'est « translateX » qui les déplace, pas « left ».
+    wipeClip:    { position: "absolute", left: 0, top: 0, bottom: 0, overflow: "hidden" },
+    wipeLine:    { position: "absolute", left: 0, top: 0, bottom: 0, width: 2, backgroundColor: c.amber },
+    wipeGrip:    {
+      position: "absolute", left: -18, top: "50%", marginTop: -18,
+      width: 36, height: 36, borderRadius: 18, backgroundColor: c.amber,
+      alignItems: "center", justifyContent: "center",
+      // Le marqueur doit rester lisible sur une photo claire.
+      borderWidth: 2, borderColor: "#0006",
+    },
     wipeTag:     { position: "absolute", top: 10, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6, backgroundColor: "#000a" },
     wipeTagTxt:  { fontSize: 9, letterSpacing: 1.5, fontWeight: "800", color: "#fff" },
 
@@ -70,7 +82,11 @@ export default function CompareScreen() {
   const [apresId, setApresId] = useState<number | null>(null);
   const [mode, setMode] = useState<Mode>("cote");
 
-  const [ratio, setRatio] = useState(0.5);
+  // La position du curseur est une valeur animée, pas un état React : à
+  // 120 images par seconde, chaque mouvement provoquait un rendu complet de
+  // l'écran — bandeaux de vignettes compris — d'où les saccades.
+  const ratio = useRef(new Animated.Value(0.5)).current;
+  const [largeurVue, setLargeurVue] = useState(0);
   const zone = useRef<View>(null);
   const largeur = useRef(0);
   const gauche = useRef(0);
@@ -96,16 +112,22 @@ export default function CompareScreen() {
   /** x est une coordonnée absolue à l'écran ; on la ramène dans la zone. */
   const majRatio = (x: number) => {
     if (largeur.current <= 0 || !Number.isFinite(x)) return;
-    setRatio(Math.max(0, Math.min(1, (x - gauche.current) / largeur.current)));
+    ratio.setValue(Math.max(0, Math.min(1, (x - gauche.current) / largeur.current)));
   };
 
   // On mesure la position à l'écran : locationX n'est pas fiable pour la
   // souris sur le web, alors que x0/moveX du geste sont absolus partout.
   // onLayout ne se déclenchant pas ici, la mesure est faite explicitement.
-  const mesurer = () => {
+  // La mesure est asynchrone : l'appelant passe ce qu'il veut faire ensuite,
+  // sinon le premier appui se calait sur une mesure périmée et sautait.
+  const mesurer = (ensuite?: () => void) => {
     zone.current?.measureInWindow((x, _y, w) => {
       gauche.current = x;
-      if (w > 0) largeur.current = w;
+      if (w > 0) {
+        largeur.current = w;
+        setLargeurVue(w);
+      }
+      ensuite?.();
     });
   };
 
@@ -118,12 +140,27 @@ export default function CompareScreen() {
 
   const pan = useRef(
     PanResponder.create({
+      // En capture : sans ça le ScrollView qui entoure la zone réclamait le
+      // geste dès le premier mouvement vertical et le relâchait aussitôt —
+      // c'est pourquoi il fallait recliquer pour reprendre.
+      onStartShouldSetPanResponderCapture: () => true,
+      onMoveShouldSetPanResponderCapture: () => true,
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (_e, g) => { mesurer(); majRatio(g.x0); },
+      // Et on refuse de le rendre une fois qu'on l'a.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderGrant: (_e, g) => mesurer(() => majRatio(g.x0)),
       onPanResponderMove: (_e, g) => majRatio(g.moveX),
     }),
   ).current;
+
+  // Animated ne sait pas interpoler vers des pourcentages sur toutes les
+  // plateformes : on travaille donc en pixels, à partir de la largeur mesurée.
+  const enPixels = ratio.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, largeurVue || 1],
+  });
 
   const avant = photos.find(p => p.id === avantId) ?? null;
   const apres = photos.find(p => p.id === apresId) ?? null;
@@ -139,7 +176,9 @@ export default function CompareScreen() {
       : null;
 
   const onLayout = (e: LayoutChangeEvent) => {
-    largeur.current = e.nativeEvent.layout.width;
+    const w = e.nativeEvent.layout.width;
+    largeur.current = w;
+    setLargeurVue(w);
     mesurer();
   };
 
@@ -227,22 +266,28 @@ export default function CompareScreen() {
         ) : (
           <View ref={zone} style={styles.wipeWrap} onLayout={onLayout} {...pan.panHandlers}>
             {avant && <Image source={{ uri: urls[avant.id] }} style={styles.wipeImg} resizeMode="cover" />}
-            <View style={[styles.wipeClip, { width: `${ratio * 100}%` }]}>
-              {apres && (
+            {/* La fenêtre se rétrécit, mais l'image qu'elle découpe garde la
+                largeur de la zone : sinon elle s'écraserait au lieu d'être
+                révélée. */}
+            <Animated.View style={[styles.wipeClip, { width: enPixels }]}>
+              {apres && largeurVue > 0 && (
                 <Image
                   source={{ uri: urls[apres.id] }}
-                  style={[styles.wipeImg, { width: largeur.current || undefined }]}
+                  style={[styles.wipeImg, { width: largeurVue }]}
                   resizeMode="cover"
                 />
               )}
-            </View>
-            <View style={[styles.wipeLine, { left: `${ratio * 100}%` }]} pointerEvents="none" />
-            <View
-              style={[styles.wipeGrip, { left: `${ratio * 100}%`, marginLeft: -18, top: "50%", marginTop: -18 }]}
+            </Animated.View>
+            <Animated.View
+              style={[styles.wipeLine, { transform: [{ translateX: enPixels }] }]}
+              pointerEvents="none"
+            />
+            <Animated.View
+              style={[styles.wipeGrip, { transform: [{ translateX: enPixels }] }]}
               pointerEvents="none"
             >
               <MaterialIcons name="code" size={18} color={colors.onAmber} />
-            </View>
+            </Animated.View>
             <View style={[styles.wipeTag, { left: 10 }]} pointerEvents="none">
               <Text style={styles.wipeTagTxt}>APRÈS</Text>
             </View>
