@@ -1,18 +1,9 @@
 import { Stack, useRouter, useSegments } from "expo-router";
 import { useEffect } from "react";
-import { Text, View } from "react-native";
+import { Platform } from "react-native";
+import { Splash } from "../components/Splash";
 import { AuthProvider, useAuth } from "../contexts/AuthContext";
-import { ThemeProvider, useTheme } from "../contexts/ThemeContext";
-
-function Splash({ message }: { message?: string }) {
-  const { colors } = useTheme();
-  return (
-    <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center", gap: 14 }}>
-      <Text style={{ color: "#C9A96E", fontSize: 32 }}>◈</Text>
-      {message && <Text style={{ color: colors.textMuted, fontSize: 11, letterSpacing: 2 }}>{message}</Text>}
-    </View>
-  );
-}
+import { ThemeProvider } from "../contexts/ThemeContext";
 
 function RootNavigator() {
   const { session, loading, syncing, recuperation } = useAuth();
@@ -53,6 +44,17 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // La superposition HTML a tenu l'écran pendant le chargement du bundle ;
+  // à partir d'ici c'est React qui affiche, elle doit partir.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const voile = document.getElementById("preamorce");
+    if (!voile) return;
+    voile.classList.add("parti");
+    const t = setTimeout(() => voile.remove(), 300);
+    return () => clearTimeout(t);
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>

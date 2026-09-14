@@ -3,6 +3,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useRouter } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Splash } from "../../components/Splash";
 import { RankSheet } from "../../components/RankSheet";
 import { ScreenHeader } from "../../components/ScreenHeader";
 import { AreaChart, Card, Pill, ProgressBar, Rings, SectionTitle, Sparkline } from "../../components/ui";
@@ -149,11 +150,7 @@ export default function Biometrie() {
   };
 
   if (!pret) {
-    return (
-      <View style={[styles.root, { alignItems: "center", justifyContent: "center" }]}>
-        <Text style={{ color: colors.amber, fontSize: 30 }}>◈</Text>
-      </View>
-    );
+    return <Splash />;
   }
 
   const aujourdhui  = new Date();

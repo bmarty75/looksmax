@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView,
   StyleSheet, Text, TextInput, TouchableOpacity, View,
 } from "react-native";
+import { Splash } from "../components/Splash";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { RANKS, libelleRang } from "../constants/data";
 import { Partage, chargerPartage, enregistrerPartage, publierProfil } from "../lib/social";
@@ -220,9 +221,7 @@ export default function ProfileScreen() {
 
   if (chargement) {
     return (
-      <View style={[styles.root, { justifyContent: "center", alignItems: "center" }]}>
-        <Text style={{ color: colors.amber, fontSize: 32 }}>◈</Text>
-      </View>
+      <Splash />
     );
   }
 

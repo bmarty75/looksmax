@@ -2,6 +2,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import { Image, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Splash } from "../../components/Splash";
 import { Card, Pill, ProgressBar, Rings, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { initiales } from "../../lib/profile";
@@ -105,9 +106,7 @@ export default function ProfilAmi() {
 
   if (chargement) {
     return (
-      <View style={[styles.root, { alignItems: "center", justifyContent: "center" }]}>
-        <Text style={{ color: colors.amber, fontSize: 30 }}>◈</Text>
-      </View>
+      <Splash />
     );
   }
 
