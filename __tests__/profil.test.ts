@@ -1,6 +1,6 @@
 import {
   BIO_MAX, EMPTY_PROFILE, PSEUDO_MAX, PSEUDO_MIN,
-  estPseudoDejaPris, initiales, verifierPseudo,
+  cadreCarre, estPseudoDejaPris, initiales, verifierPseudo,
 } from "../lib/profile";
 import { PARTAGE_DEFAUT } from "../lib/social";
 import { RANKS, SEXE_DEFAUT, descriptionRang, libelleRang } from "../constants/data";
@@ -56,6 +56,51 @@ describe("échelle selon le sexe", () => {
   it("adapte aussi la description quand elle nomme le palier", () => {
     expect(descriptionRang(parLabel("LTN"), "femme")).toContain("Becky");
     expect(descriptionRang(parLabel("LTN"), "homme")).toContain("Normie");
+  });
+});
+
+describe("cadreCarre", () => {
+  it("prend un carré centré dans une photo paysage", () => {
+    // 400×200 : on garde les 200 px du milieu, 100 px rognés de chaque côté.
+    expect(cadreCarre(400, 200)).toEqual({ originX: 100, originY: 0, width: 200, height: 200 });
+  });
+
+  it("prend un carré centré dans une photo portrait", () => {
+    expect(cadreCarre(200, 400)).toEqual({ originX: 0, originY: 100, width: 200, height: 200 });
+  });
+
+  it("ne touche pas à une image déjà carrée", () => {
+    expect(cadreCarre(512, 512)).toBeNull();
+  });
+
+  it("renonce quand les dimensions manquent", () => {
+    // Mieux vaut ne pas recadrer que recadrer de travers : sans recadrage,
+    // l'affichage rogne lui-même ; avec de mauvaises valeurs, l'image est
+    // enregistrée abîmée.
+    for (const [l, h] of [[undefined, 200], [400, undefined], [0, 200], [400, -1]] as [number?, number?][]) {
+      expect(cadreCarre(l, h)).toBeNull();
+    }
+  });
+
+  it("ne sort jamais de l'image", () => {
+    for (let i = 0; i < 500; i++) {
+      const l = 1 + Math.floor(Math.random() * 4000);
+      const h = 1 + Math.floor(Math.random() * 4000);
+      const c = cadreCarre(l, h);
+      if (!c) { expect(l).toBe(h); continue; }
+      expect(c.width).toBe(c.height);
+      expect(c.originX).toBeGreaterThanOrEqual(0);
+      expect(c.originY).toBeGreaterThanOrEqual(0);
+      expect(c.originX + c.width).toBeLessThanOrEqual(l);
+      expect(c.originY + c.height).toBeLessThanOrEqual(h);
+      // Le carré fait bien la taille du plus petit côté.
+      expect(c.width).toBe(Math.min(l, h));
+    }
+  });
+
+  it("reste centré à un pixel près sur les tailles impaires", () => {
+    const c = cadreCarre(401, 200)!;
+    expect(Math.abs((401 - c.width) / 2 - c.originX)).toBeLessThanOrEqual(0.5);
   });
 });
 

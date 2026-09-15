@@ -106,10 +106,42 @@ export type AvatarPick =
   | { ok: true; avatar: string }
   | { ok: false; message: string | null }; // message null = simple annulation
 
+export interface Cadre {
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+}
+
 /**
- * Ouvre la galerie, recadre en carré, puis réduit à 256 px avant d'encoder.
- * Sans cette réduction, une photo pleine résolution partirait telle quelle
- * dans le stockage synchronisé et serait retéléchargée à chaque connexion.
+ * Plus grand carré centré dans une image de `l` × `h`.
+ *
+ * Renvoie null quand il n'y a rien à faire — image déjà carrée — ou quand les
+ * dimensions sont inconnues. L'appelant saute alors le recadrage plutôt que
+ * de forcer un carré, ce qui déformerait la photo.
+ */
+export function cadreCarre(l?: number, h?: number): Cadre | null {
+  if (!l || !h || l <= 0 || h <= 0 || l === h) return null;
+  const cote = Math.min(l, h);
+  return {
+    originX: Math.round((l - cote) / 2),
+    originY: Math.round((h - cote) / 2),
+    width: cote,
+    height: cote,
+  };
+}
+
+/**
+ * Ouvre la galerie, recadre au centre en carré, puis réduit à 256 px.
+ *
+ * Le recadrage se fait ici et pas via `allowsEditing` : cette option n'existe
+ * pas sur le web, où la photo arrivait donc brute. Elle était ensuite forcée
+ * à 256×256, ce qui étirait tout ce qui n'était pas déjà carré — et la
+ * déformation partait dans l'image enregistrée, pas seulement à l'affichage.
+ *
+ * La réduction, elle, reste indispensable : une photo pleine résolution
+ * partirait telle quelle dans le stockage synchronisé et serait
+ * retéléchargée à chaque connexion.
  */
 export async function pickAvatar(): Promise<AvatarPick> {
   try {
@@ -120,15 +152,20 @@ export async function pickAvatar(): Promise<AvatarPick> {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
       quality: 1,
     });
-    if (result.canceled || !result.assets?.[0]?.uri) return { ok: false, message: null };
+    const photo = result.canceled ? null : result.assets?.[0];
+    if (!photo?.uri) return { ok: false, message: null };
 
-    const rendu = await ImageManipulator.manipulate(result.assets[0].uri)
-      .resize({ width: AVATAR_SIZE, height: AVATAR_SIZE })
-      .renderAsync();
+    let etapes = ImageManipulator.manipulate(photo.uri);
+
+    const cadre = cadreCarre(photo.width, photo.height);
+    if (cadre) etapes = etapes.crop(cadre);
+
+    // Seule la largeur est imposée : la hauteur suit. Si le recadrage n'a pas
+    // pu se faire, on obtient une image non carrée mais juste de proportions,
+    // que l'affichage rognera — jamais une image déformée.
+    const rendu = await etapes.resize({ width: AVATAR_SIZE }).renderAsync();
 
     const image = await rendu.saveAsync({
       compress: 0.7,

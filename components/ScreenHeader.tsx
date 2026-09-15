@@ -77,7 +77,7 @@ export function ScreenHeader({
           onPress={() => router.push("/profile")}
         >
           {avatar
-            ? <Image source={{ uri: avatar }} style={s.avatarImg} />
+            ? <Image source={{ uri: avatar }} style={s.avatarImg} resizeMode="cover" />
             : <MaterialIcons name="person" size={19} color="#101014" />}
         </TouchableOpacity>
       </View>

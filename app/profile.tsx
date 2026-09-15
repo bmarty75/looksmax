@@ -245,7 +245,7 @@ export default function ProfileScreen() {
               {avatarOccupe ? (
                 <ActivityIndicator color={colors.amber} />
               ) : profile.avatar ? (
-                <Image source={{ uri: profile.avatar }} style={styles.avatarImg} />
+                <Image source={{ uri: profile.avatar }} style={styles.avatarImg} resizeMode="cover" />
               ) : (
                 <Text style={styles.avatarInit}>{initiales(profile.pseudo, email)}</Text>
               )}

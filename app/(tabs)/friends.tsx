@@ -93,7 +93,7 @@ export default function Amis() {
   const vignette = (p: { pseudo: string; avatar: string | null }) => (
     <View style={styles.avatar}>
       {p.avatar
-        ? <Image source={{ uri: p.avatar }} style={styles.avatarImg} />
+        ? <Image source={{ uri: p.avatar }} style={styles.avatarImg} resizeMode="cover" />
         : <Text style={styles.initiales}>{initiales(p.pseudo, null)}</Text>}
     </View>
   );

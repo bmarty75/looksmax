@@ -135,7 +135,7 @@ export default function ProfilAmi() {
       <View style={styles.entete}>
         <View style={styles.avatar}>
           {profil.avatar
-            ? <Image source={{ uri: profil.avatar }} style={styles.avatarImg} />
+            ? <Image source={{ uri: profil.avatar }} style={styles.avatarImg} resizeMode="cover" />
             : <Text style={styles.initiales}>{initiales(profil.pseudo, null)}</Text>}
         </View>
         <Text style={styles.pseudo}>{profil.pseudo || "Sans pseudo"}</Text>
