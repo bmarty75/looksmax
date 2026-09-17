@@ -7,7 +7,8 @@ import { ScreenHeader } from "../../components/ScreenHeader";
 import { Card, Pill, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { SEXE_DEFAUT, Sexe } from "../../constants/data";
-import { storage } from "../../hooks/useStorage";
+import { useVersionSynchro } from "../../hooks/useVersionSynchro";
+import { chargerHistorique } from "../../lib/historique";
 import { rangCourant } from "../../lib/metrics";
 import { initiales, loadProfile } from "../../lib/profile";
 import {
@@ -57,14 +58,20 @@ export default function Amis() {
     setReseau(await chargerReseau());
   }, []);
 
+  // Relit les données quand la synchro en arrière-plan revient.
+  const synchro = useVersionSynchro();
+
   useFocusEffect(
     useCallback(() => {
-      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      chargerHistorique().then(setHistory);
       loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
       // On republie à l'ouverture : les amis voient des chiffres à jour.
       publierProfil();
       rafraichir();
-    }, [rafraichir]),
+    // « synchro » n'est pas lu dans le corps : sa seule présence ici
+    // change l'identité de la fonction, ce qui relance le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [rafraichir, synchro]),
   );
 
   const lancerRecherche = async (texte: string) => {

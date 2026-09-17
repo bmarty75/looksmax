@@ -19,6 +19,18 @@ const LEGACY_PREFIXES = ["lm_habits", "lm_goals", "lm_photos", "lm_history", "lm
 
 let activeUserId: string | null = null;
 
+// ─── Fin de synchro ───────────────────────────────────────────
+// Les écrans lisent le cache local dès leur affichage, souvent avant que la
+// synchro en arrière-plan ne soit revenue. Sans ce signal, ils restaient sur
+// ces données incomplètes : un streak à 0 jusqu'à la navigation suivante.
+const auditeurs = new Set<() => void>();
+
+/** Appelle `fn` à chaque synchro terminée. Renvoie de quoi se désabonner. */
+export function abonnerSynchro(fn: () => void): () => void {
+  auditeurs.add(fn);
+  return () => { auditeurs.delete(fn); };
+}
+
 const namespaced = (key: string) =>
   DEVICE_KEYS.has(key) ? key : `lm:${activeUserId ?? "local"}:${key}`;
 
@@ -63,6 +75,25 @@ export const storage = {
       return defaultValue;
     }
   },
+  /**
+   * Toutes les valeurs dont la clé commence par `prefixe`, indexées par la
+   * fin de clé. Sert aux données rangées une ligne par jour.
+   */
+  parPrefixe: async (prefixe: string): Promise<Record<string, any>> => {
+    try {
+      const complet = namespaced(prefixe);
+      const cles = (await AsyncStorage.getAllKeys()).filter(k => k.startsWith(complet));
+      if (cles.length === 0) return {};
+      const sortie: Record<string, any> = {};
+      for (const [k, v] of await AsyncStorage.multiGet(cles)) {
+        if (v == null) continue;
+        try { sortie[k.slice(complet.length)] = JSON.parse(v); } catch { /* valeur illisible : ignorée */ }
+      }
+      return sortie;
+    } catch {
+      return {};
+    }
+  },
   set: async (key: string, value: any) => {
     // Au démarrage, les onglets se montent le temps d'une image avant que la
     // navigation ne renvoie vers la connexion : sans ce garde-fou, ils
@@ -80,9 +111,16 @@ export const storage = {
 
 /** Bascule le stockage sur un compte (ou sur le mode déconnecté si null). */
 export function setActiveUser(userId: string | null) {
+  // Les écritures en attente ne sont abandonnées que si l'on change vraiment
+  // de compte — il ne faut pas pousser les données de l'un chez l'autre.
+  // Supabase rappelle cette fonction pour le même compte à chaque
+  // renouvellement de jeton, environ toutes les heures : vider la file à ce
+  // moment-là perdait une coche faite dans la seconde précédente.
+  if (userId !== activeUserId) {
+    pending.clear();
+    if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+  }
   activeUserId = userId;
-  pending.clear();
-  if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
 }
 
 /**
@@ -100,9 +138,15 @@ export async function pullFromCloud(): Promise<void> {
 
     if (error || !data) return;
 
+    // Une clé encore en file d'envoi porte une modification que le serveur
+    // n'a pas reçue : sa version distante est plus ancienne, l'écrire en
+    // local annulerait ce que l'utilisateur vient de faire.
     await Promise.all(
-      data.map(row => AsyncStorage.setItem(namespaced(row.key), JSON.stringify(row.value))),
+      data
+        .filter(row => !pending.has(row.key))
+        .map(row => AsyncStorage.setItem(namespaced(row.key), JSON.stringify(row.value))),
     );
+    auditeurs.forEach(fn => fn());
   } catch {
     // réseau indisponible
   }

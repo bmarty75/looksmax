@@ -7,6 +7,7 @@ import {
 } from "react-native";
 import { ThemeColors, useTheme } from "../contexts/ThemeContext";
 import { storage } from "../hooks/useStorage";
+import { chargerHistorique } from "../lib/historique";
 import { Photo, ecartEnJours, moyenneScore, photoDateKey } from "../lib/photos";
 import { useUrlsPhotos } from "../hooks/useUrlsPhotos";
 
@@ -94,7 +95,7 @@ export default function CompareScreen() {
   useEffect(() => {
     (async () => {
       const p: Photo[] = await storage.get("lm_photos", []);
-      const h = await storage.get("lm_history", {});
+      const h = await chargerHistorique();
       const liste = Array.isArray(p) ? p : [];
       setPhotos(liste);
       setHistory(h && typeof h === "object" ? h : {});

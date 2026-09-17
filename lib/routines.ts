@@ -1,4 +1,5 @@
 import { storage } from "../hooks/useStorage";
+import { chargerHistorique, enregistrerJour } from "./historique";
 
 export interface Bascule {
   checked: Record<string, boolean>;
@@ -22,11 +23,11 @@ export async function basculerRoutine(
   const suivant = { ...checked, [id]: !checked[id] };
   await storage.set(`lm_checked_${jour}`, suivant);
 
+  // Seule la journée cochée est écrite. Relire l'historique entier puis le
+  // renvoyer effaçait les journées qu'un autre appareil avait enregistrées.
   const faits = Object.values(suivant).filter(Boolean).length;
   const pct = habits.length > 0 ? Math.round((faits / habits.length) * 100) : 0;
-  const hist = await storage.get("lm_history", {});
-  const maj = { ...hist, [jour]: pct };
-  await storage.set("lm_history", maj);
+  await enregistrerJour(jour, pct);
 
   // Compteur d'eau : c'est la condition du badge d'hydratation, qui compte
   // les verres et pas les journées.
@@ -36,5 +37,5 @@ export async function basculerRoutine(
     await storage.set("lm_stats", { ...s, waterCount: Math.max(0, (s.waterCount || 0) + delta) });
   }
 
-  return { checked: suivant, history: maj };
+  return { checked: suivant, history: await chargerHistorique() };
 }

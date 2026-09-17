@@ -10,12 +10,14 @@ import { AreaChart, Card, Pill, ProgressBar, Rings, SectionTitle, Sparkline } fr
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { DEFAULT_HABITS, SEXE_DEFAUT, Sexe, getRank, libelleRang, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { useVersionSynchro } from "../../hooks/useVersionSynchro";
 import { cleJour } from "../../lib/dates";
 import {
   compute30DayAvg, computeCompositeScore, computeCurrentStreak, indexPsl,
   partsParCategorie, projectionRangSuivant, serieCompletion, serieScore,
 } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
+import { chargerHistorique } from "../../lib/historique";
 import { basculerRoutine } from "../../lib/routines";
 
 const JOURS = ["DIM", "LUN", "MAR", "MER", "JEU", "VEN", "SAM"];
@@ -91,24 +93,23 @@ export default function Biometrie() {
   const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
   const [echelleOuverte, setEchelleOuverte] = useState(false);
 
+  // Relit les données quand la synchro en arrière-plan revient.
+  const synchro = useVersionSynchro();
+
   useFocusEffect(
     useCallback(() => {
       (async () => {
         try {
           const h  = await storage.get("lm_habits", DEFAULT_HABITS);
           const ch = await storage.get(`lm_checked_${todayKey()}`, {});
-          const hi = await storage.get("lm_history", {});
+          const historyObj = await chargerHistorique();
 
           const habitsArr  = Array.isArray(h) ? h : DEFAULT_HABITS;
           const checkedObj = ch && typeof ch === "object" ? ch : {};
-          const historyObj = hi && typeof hi === "object" ? hi : {};
-
-          const faits = Object.values(checkedObj).filter(Boolean).length;
-          const pct = habitsArr.length > 0 ? Math.round((faits / habitsArr.length) * 100) : 0;
-          if (historyObj[todayKey()] !== pct) {
-            historyObj[todayKey()] = pct;
-            await storage.set("lm_history", historyObj);
-          }
+          // Aucune écriture ici. Le tableau de bord recalculait la journée à
+          // partir des coches locales et la renvoyait : sur un appareil en
+          // retard, qui ne voyait pas les coches faites ailleurs, il
+          // enregistrait 0 % par-dessus une journée réellement faite.
 
           const counts: Record<string, number> = {};
           for (let i = 0; i < 7; i++) {
@@ -133,7 +134,10 @@ export default function Biometrie() {
           setPret(true);
         }
       })();
-    }, []),
+    // « synchro » n'est pas lu dans le corps : sa seule présence ici
+    // change l'identité de la fonction, ce qui relance le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [synchro]),
   );
 
   const allerAuxRoutines = () => router.push("/habits");

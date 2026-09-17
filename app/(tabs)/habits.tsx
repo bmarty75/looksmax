@@ -11,6 +11,8 @@ import { BigButton, Card, Pill, SegmentBar } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { CATEGORIES, COLORS, DEFAULT_HABITS, ICONS, SEXE_DEFAUT, Sexe, todayKey } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { useVersionSynchro } from "../../hooks/useVersionSynchro";
+import { chargerHistorique } from "../../lib/historique";
 import { decalerCle, jourDepuisCle } from "../../lib/dates";
 import { computeCurrentStreak, rangCourant } from "../../lib/metrics";
 import { basculerRoutine } from "../../lib/routines";
@@ -104,17 +106,23 @@ export default function Routines() {
     }
   }, []);
 
+  // Relit les données quand la synchro en arrière-plan revient.
+  const synchro = useVersionSynchro();
+
   useFocusEffect(
     useCallback(() => {
       storage.get("lm_habits", DEFAULT_HABITS).then(h => setHabits(Array.isArray(h) ? h : DEFAULT_HABITS));
-      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      chargerHistorique().then(setHistory);
       loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
-    }, []),
+    // « synchro » n'est pas lu dans le corps : sa seule présence ici
+    // change l'identité de la fonction, ce qui relance le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [synchro]),
   );
 
   useEffect(() => {
     storage.get(`lm_checked_${jour}`, {}).then(c => setChecked(c && typeof c === "object" ? c : {}));
-  }, [jour]);
+  }, [jour, synchro]);
 
   const enregistrer = async (liste: any[]) => {
     setHabits(liste);

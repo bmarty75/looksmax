@@ -9,6 +9,8 @@ import { BigButton, Card, Pill, SectionTitle } from "../../components/ui";
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { SEXE_DEFAUT, Sexe } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { useVersionSynchro } from "../../hooks/useVersionSynchro";
+import { chargerHistorique } from "../../lib/historique";
 import { rangCourant } from "../../lib/metrics";
 import { Photo, PhotoPick, choisirPhoto, ecartEnJours, grouperParMois, prendrePhoto } from "../../lib/photos";
 import { migrerPhotos, supprimerFichier } from "../../lib/stockagePhotos";
@@ -66,6 +68,9 @@ export default function Progression() {
 
   const urls = useUrlsPhotos(photos);
 
+  // Relit les données quand la synchro en arrière-plan revient.
+  const synchro = useVersionSynchro();
+
   useFocusEffect(
     useCallback(() => {
       storage.get("lm_photos", []).then(async liste => {
@@ -79,9 +84,12 @@ export default function Progression() {
           await storage.set("lm_photos", reprises);
         }
       });
-      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      chargerHistorique().then(setHistory);
       loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
-    }, []),
+    // « synchro » n'est pas lu dans le corps : sa seule présence ici
+    // change l'identité de la fonction, ce qui relance le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [synchro]),
   );
 
   const enregistrer = async (liste: Photo[]) => {

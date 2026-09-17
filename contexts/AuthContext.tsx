@@ -155,14 +155,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
 
-    const { data: sub } = supabase.auth.onAuthStateChange(async (event, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
       // Le lien de l'e-mail ouvre une session valide : sans ce drapeau,
       // l'utilisateur atterrirait sur le tableau de bord sans jamais avoir
       // choisi de nouveau mot de passe, et le lien resterait la seule clé.
       if (event === "PASSWORD_RECOVERY") setRecuperation(true);
-      await activate(s);
-      setSession(s);
-      setLoading(false);
+
+      // Tout appel à Supabase est repoussé hors de ce rappel. Supabase y
+      // tient un verrou sur la session : une requête lancée dedans pouvait
+      // partir avant que le jeton du compte soit attaché, revenir vide à
+      // cause des règles d'accès, et l'app s'affichait sur un historique vide
+      // — un streak à 0 juste après la connexion.
+      setTimeout(async () => {
+        await activate(s);
+        setSession(s);
+        setLoading(false);
+      }, 0);
     });
 
     return () => sub.subscription.unsubscribe();

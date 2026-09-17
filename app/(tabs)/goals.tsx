@@ -8,6 +8,8 @@ import { AreaChart, BigButton, Card, MiniRing, Pill, ProgressBar, SectionTitle }
 import { ThemeColors, useTheme } from "../../contexts/ThemeContext";
 import { COLORS, ICONS, SEXE_DEFAUT, Sexe } from "../../constants/data";
 import { storage } from "../../hooks/useStorage";
+import { useVersionSynchro } from "../../hooks/useVersionSynchro";
+import { chargerHistorique } from "../../lib/historique";
 import { cleJour } from "../../lib/dates";
 import { rangCourant, serieScore } from "../../lib/metrics";
 import { loadProfile } from "../../lib/profile";
@@ -78,13 +80,19 @@ export default function Objectifs() {
   const [form, setForm]             = useState({ label: "", target: "30", unit: "j", icon: "🎯", color: COLORS[5] });
   const [aSupprimer, setASupprimer] = useState<{ id: string; label: string } | null>(null);
 
+  // Relit les données quand la synchro en arrière-plan revient.
+  const synchro = useVersionSynchro();
+
   useFocusEffect(
     useCallback(() => {
       // Aucun objectif d'exemple : chacun crée les siens.
       storage.get("lm_goals", []).then(g => setGoals(Array.isArray(g) ? g : []));
-      storage.get("lm_history", {}).then(h => setHistory(h && typeof h === "object" ? h : {}));
+      chargerHistorique().then(setHistory);
       loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
-    }, []),
+    // « synchro » n'est pas lu dans le corps : sa seule présence ici
+    // change l'identité de la fonction, ce qui relance le chargement.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [synchro]),
   );
 
   const enregistrer = async (liste: any[]) => {

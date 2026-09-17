@@ -3,6 +3,7 @@ import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
 import { DEFAULT_HABITS, getRank, libelleRang, todayKey } from "../constants/data";
 import { cleJour } from "./dates";
+import { chargerHistorique } from "./historique";
 import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
 
@@ -68,7 +69,7 @@ export interface ProfilPublic {
 async function construireInstantane(): Promise<Omit<ProfilPublic, "user_id">> {
   const partage = await chargerPartage();
   const profil = await loadProfile();
-  const history: Record<string, number> = await storage.get("lm_history", {});
+  const history = await chargerHistorique();
   // Même repli que l'écran Routines : tant que rien n'a été modifié, rien
   // n'est écrit en stockage, et publier [] afficherait un profil sans aucune
   // routine alors que l'appli montre bien celles de départ. Les objectifs,
