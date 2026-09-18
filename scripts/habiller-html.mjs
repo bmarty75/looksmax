@@ -79,9 +79,28 @@ const VOILE = `<div id="preamorce" aria-hidden="true">
     </div>
     <div id="root">`;
 
+/**
+ * Ajout à l'écran d'accueil. Sans ces déclarations, le téléphone n'a aucune
+ * icône à utiliser et en fabrique une avec la première lettre du titre — un
+ * « D » sur fond gris. Les fichiers viennent de public/, qu'Expo recopie à
+ * la racine du site.
+ */
+const ECRAN_ACCUEIL = [
+  `<link rel="manifest" href="/manifest.json" />`,
+  // iOS ne lit pas les icônes du manifeste : il lui faut la sienne.
+  `<link rel="apple-touch-icon" href="/apple-touch-icon.png" />`,
+  `<meta name="apple-mobile-web-app-capable" content="yes" />`,
+  `<meta name="mobile-web-app-capable" content="yes" />`,
+  `<meta name="apple-mobile-web-app-title" content="DAILYMAXING" />`,
+  // « black » et non « black-translucent » : ce dernier fait passer le
+  // contenu sous la barre d'état et l'encoche, et les en-têtes n'ont pas été
+  // prévus pour. Sur un fond déjà sombre, la différence ne se voit pas.
+  `<meta name="apple-mobile-web-app-status-bar-style" content="black" />`,
+].join("\n    ");
+
 const REMPLACEMENTS = [
   ['<html lang="en">', '<html lang="fr">'],
-  ["<title>dailymaxing</title>", `<title>DAILYMAXING</title>\n    <meta name="theme-color" content="${SOMBRE.fond}" />`],
+  ["<title>dailymaxing</title>", `<title>DAILYMAXING</title>\n    <meta name="theme-color" content="${SOMBRE.fond}" />\n    ${ECRAN_ACCUEIL}`],
   ["</head>", `${PEINDRE_TOT}\n${STYLE}\n</head>`],
   ['<div id="root">', VOILE],
 ];
