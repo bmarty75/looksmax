@@ -19,6 +19,9 @@ const LEGACY_PREFIXES = ["lm_habits", "lm_goals", "lm_photos", "lm_history", "lm
 
 let activeUserId: string | null = null;
 
+/** Compte dont les données sont chargées, sans aller-retour réseau. */
+export const utilisateurActif = () => activeUserId;
+
 // ─── Fin de synchro ───────────────────────────────────────────
 // Les écrans lisent le cache local dès leur affichage, souvent avant que la
 // synchro en arrière-plan ne soit revenue. Sans ce signal, ils restaient sur

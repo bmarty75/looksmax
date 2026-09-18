@@ -12,8 +12,8 @@ import { chargerHistorique } from "../../lib/historique";
 import { rangCourant } from "../../lib/metrics";
 import { initiales, loadProfile } from "../../lib/profile";
 import {
-  Ami, Reseau, accepterDemande, chargerReseau, chercherProfils,
-  envoyerDemande, publierProfil, retirerLien,
+  Ami, RESEAU_VIDE, Reseau, accepterDemande, chargerReseau, chercherProfils,
+  envoyerDemande, publierProfil, reseauEnCache, retirerLien,
 } from "../../lib/social";
 
 function makeStyles(c: ThemeColors) {
@@ -30,6 +30,7 @@ function makeStyles(c: ThemeColors) {
     initiales:  { fontSize: 15, fontWeight: "800", color: c.amber },
     pseudo:     { fontSize: 15, fontWeight: "700", color: c.text },
     sous:       { fontSize: 11.5, color: c.textMuted, marginTop: 2 },
+    fantome:    { height: 12, borderRadius: 6, backgroundColor: c.surface },
 
     action:     { paddingHorizontal: 13, paddingVertical: 8, borderRadius: 999 },
     actionTxt:  { fontSize: 11.5, fontWeight: "800" },
@@ -49,7 +50,9 @@ export default function Amis() {
   const [history, setHistory]   = useState<Record<string, number>>({});
   const [avatar, setAvatar]     = useState<string | null>(null);
   const [sexe, setSexe]         = useState<Sexe>(SEXE_DEFAUT);
-  const [reseau, setReseau]     = useState<Reseau>({ amis: [], recuesEnAttente: [], envoyeesEnAttente: [] });
+  // Le réseau préchargé à l'ouverture de l'app s'affiche tout de suite ; tant
+  // qu'il n'existe pas, on n'annonce pas « aucun ami » à quelqu'un qui en a.
+  const [reseau, setReseau]     = useState<Reseau | null>(reseauEnCache);
   const [recherche, setRecherche] = useState("");
   const [resultats, setResultats] = useState<{ user_id: string; pseudo: string; avatar: string | null }[]>([]);
   const [msg, setMsg]           = useState<{ texte: string; ok: boolean } | null>(null);
@@ -65,9 +68,9 @@ export default function Amis() {
     useCallback(() => {
       chargerHistorique().then(setHistory);
       loadProfile().then(p => { setAvatar(p.avatar); setSexe(p.sexe); });
-      // On republie à l'ouverture : les amis voient des chiffres à jour.
-      publierProfil();
-      rafraichir();
+      // On republie à l'ouverture : les amis voient des chiffres à jour. Après
+      // la liste seulement, pour ne pas lui disputer la connexion.
+      rafraichir().finally(() => { publierProfil(); });
     // « synchro » n'est pas lu dans le corps : sa seule présence ici
     // change l'identité de la fonction, ce qui relance le chargement.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -105,8 +108,11 @@ export default function Amis() {
     </View>
   );
 
+  const charge = reseau !== null;
+  const { amis, recuesEnAttente, envoyeesEnAttente } = reseau ?? RESEAU_VIDE;
+
   const dejaLie = (id: string) =>
-    [...reseau.amis, ...reseau.recuesEnAttente, ...reseau.envoyeesEnAttente]
+    [...amis, ...recuesEnAttente, ...envoyeesEnAttente]
       .some(a => a.profil.user_id === id);
 
   return (
@@ -161,12 +167,12 @@ export default function Amis() {
       )}
 
       {/* Demandes reçues */}
-      {reseau.recuesEnAttente.length > 0 && (
+      {recuesEnAttente.length > 0 && (
         <View style={{ marginBottom: 22 }}>
-          <SectionTitle right={<Pill color={colors.amber} teinte={`${colors.amber}22`}>{reseau.recuesEnAttente.length}</Pill>}>
+          <SectionTitle right={<Pill color={colors.amber} teinte={`${colors.amber}22`}>{recuesEnAttente.length}</Pill>}>
             DEMANDES REÇUES
           </SectionTitle>
-          {reseau.recuesEnAttente.map(a => (
+          {recuesEnAttente.map(a => (
             <View key={a.lien.id} style={styles.ligne}>
               {vignette(a.profil)}
               <View style={{ flex: 1 }}>
@@ -188,11 +194,22 @@ export default function Amis() {
       )}
 
       {/* Amis */}
-      <SectionTitle right={<Pill teinte={colors.surface}>{reseau.amis.length}</Pill>}>
+      <SectionTitle right={charge ? <Pill teinte={colors.surface}>{amis.length}</Pill> : undefined}>
         MES AMIS
       </SectionTitle>
 
-      {reseau.amis.length === 0 ? (
+      {!charge ? (
+        // Silhouettes de lignes : la page garde sa forme pendant le chargement.
+        [0, 1].map(i => (
+          <View key={i} style={[styles.ligne, { opacity: 0.5 }]}>
+            <View style={styles.avatar} />
+            <View style={{ flex: 1, gap: 6 }}>
+              <View style={[styles.fantome, { width: "45%" }]} />
+              <View style={[styles.fantome, { width: "30%", height: 9 }]} />
+            </View>
+          </View>
+        ))
+      ) : amis.length === 0 ? (
         <Card style={styles.vide}>
           <MaterialIcons name="group-add" size={38} color={colors.textFaint} />
           <Text style={styles.videTxt}>
@@ -201,7 +218,7 @@ export default function Amis() {
           </Text>
         </Card>
       ) : (
-        reseau.amis.map(a => (
+        amis.map(a => (
           <TouchableOpacity
             key={a.lien.id}
             style={styles.ligne}
@@ -218,10 +235,10 @@ export default function Amis() {
       )}
 
       {/* Demandes envoyées */}
-      {reseau.envoyeesEnAttente.length > 0 && (
+      {envoyeesEnAttente.length > 0 && (
         <View style={{ marginTop: 22 }}>
           <SectionTitle>DEMANDES ENVOYÉES</SectionTitle>
-          {reseau.envoyeesEnAttente.map(a => (
+          {envoyeesEnAttente.map(a => (
             <View key={a.lien.id} style={styles.ligne}>
               {vignette(a.profil)}
               <View style={{ flex: 1 }}>

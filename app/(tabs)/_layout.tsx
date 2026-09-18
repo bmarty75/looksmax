@@ -1,11 +1,17 @@
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { Tabs } from "expo-router";
+import { useEffect } from "react";
 import { useTheme } from "../../contexts/ThemeContext";
+import { chargerReseau } from "../../lib/social";
 
 type NomIcone = React.ComponentProps<typeof MaterialIcons>["name"];
 
 export default function TabsLayout() {
   const { colors, mode } = useTheme();
+
+  // Précharge la liste d'amis dès l'arrivée sur les onglets : le temps d'y
+  // aller, elle est prête, au lieu de partir de zéro au premier affichage.
+  useEffect(() => { chargerReseau(); }, []);
 
   const icone = (name: NomIcone) => {
     const IconeOnglet = ({ focused }: { focused: boolean }) => (

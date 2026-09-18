@@ -1,4 +1,4 @@
-import { storage } from "../hooks/useStorage";
+import { storage, utilisateurActif } from "../hooks/useStorage";
 import { isSupabaseConfigured, supabase } from "./supabase";
 import { computeCompositeScore, computeCurrentStreak, compute30DayAvg, indexPsl, partsParCategorie } from "./metrics";
 import { DEFAULT_HABITS, getRank, libelleRang, todayKey } from "../constants/data";
@@ -6,6 +6,18 @@ import { cleJour } from "./dates";
 import { chargerHistorique } from "./historique";
 import { estPseudoDejaPris, loadProfile } from "./profile";
 import type { Photo } from "./photos";
+
+/**
+ * Identifiant du compte connecté, lu dans la session locale. getUser()
+ * interroge le serveur à chaque appel et prend le verrou d'authentification :
+ * deux appels simultanés (publication + chargement des amis) se mettaient en
+ * file, et l'écran Amis attendait les deux avant d'afficher quoi que ce soit.
+ * Les droits restent vérifiés côté serveur par les règles RLS.
+ */
+async function monId(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user.id ?? null;
+}
 
 /* ─── Réglages de partage ─────────────────────────────────── */
 
@@ -142,8 +154,7 @@ export interface Publication {
 export async function publierProfil(): Promise<Publication> {
   if (!isSupabaseConfigured) return { ok: false, pseudoPris: false };
   try {
-    const { data } = await supabase.auth.getUser();
-    const uid = data.user?.id;
+    const uid = await monId();
     if (!uid) return { ok: false, pseudoPris: false };
     const instantane = await construireInstantane();
     const { error } = await supabase
@@ -178,28 +189,47 @@ export interface Reseau {
   envoyeesEnAttente: Ami[];
 }
 
-const RESEAU_VIDE: Reseau = { amis: [], recuesEnAttente: [], envoyeesEnAttente: [] };
+export const RESEAU_VIDE: Reseau = { amis: [], recuesEnAttente: [], envoyeesEnAttente: [] };
+
+/**
+ * Dernier réseau chargé, rattaché à son compte. Il sert à afficher la liste
+ * immédiatement, pendant que la version fraîche arrive, au lieu d'un écran
+ * vide à chaque ouverture de l'onglet.
+ */
+let cacheReseau: { uid: string; reseau: Reseau } | null = null;
+
+/** Réseau déjà connu pour le compte actif, ou null s'il n'a jamais été chargé. */
+export function reseauEnCache(): Reseau | null {
+  return cacheReseau && cacheReseau.uid === utilisateurActif() ? cacheReseau.reseau : null;
+}
 
 export async function chargerReseau(): Promise<Reseau> {
   if (!isSupabaseConfigured) return RESEAU_VIDE;
-  try {
-    const { data: auth } = await supabase.auth.getUser();
-    const moi = auth.user?.id;
-    if (!moi) return RESEAU_VIDE;
+  const moi = await monId().catch(() => null);
+  if (!moi) return RESEAU_VIDE;
+  const reseau = await lireReseau(moi);
+  // Un échec réseau renvoie null : on garde alors la dernière liste connue
+  // plutôt que d'annoncer « aucun ami ».
+  if (reseau) { cacheReseau = { uid: moi, reseau }; return reseau; }
+  return cacheReseau?.uid === moi ? cacheReseau.reseau : RESEAU_VIDE;
+}
 
-    const { data: liens, error } = await supabase
-      .from("friendships")
-      .select("id, demandeur, destinataire, statut");
-    if (error || !liens) return RESEAU_VIDE;
+async function lireReseau(moi: string): Promise<Reseau | null> {
+  try {
+    // Le profil d'une demande encore en attente est invisible (RLS) : sans ça,
+    // on afficherait « qui ? » à la place du pseudo. Cette fonction ne rend que
+    // pseudo et avatar, et seulement pour les comptes déjà liés à moi.
+    // Les deux requêtes sont indépendantes : on les lance ensemble.
+    type Identite = { user_id: string; pseudo: string; avatar: string | null };
+    const [{ data: liens, error }, { data: identites }] = await Promise.all([
+      supabase.from("friendships").select("id, demandeur, destinataire, statut"),
+      supabase.rpc("identites_liees"),
+    ]);
+    if (error || !liens) return null;
 
     const autres = liens.map(l => (l.demandeur === moi ? l.destinataire : l.demandeur));
     if (autres.length === 0) return RESEAU_VIDE;
 
-    // Le profil d'une demande encore en attente est invisible (RLS) : sans ça,
-    // on afficherait « qui ? » à la place du pseudo. Cette fonction ne rend que
-    // pseudo et avatar, et seulement pour les comptes déjà liés à moi.
-    type Identite = { user_id: string; pseudo: string; avatar: string | null };
-    const { data: identites } = await supabase.rpc("identites_liees");
     const profils: Identite[] = (identites as Identite[] | null) ?? (await supabase
       .from("profiles")
       .select("user_id, pseudo, avatar")
@@ -223,7 +253,7 @@ export async function chargerReseau(): Promise<Reseau> {
       envoyeesEnAttente: tous.filter(a => a.lien.statut === "en_attente" && a.jenSuisLauteur),
     };
   } catch {
-    return RESEAU_VIDE;
+    return null;
   }
 }
 
@@ -243,8 +273,7 @@ export async function chercherProfils(recherche: string) {
 export async function envoyerDemande(destinataire: string): Promise<Resultat> {
   if (!isSupabaseConfigured) return { ok: false, message: "Serveur non configuré." };
   try {
-    const { data: auth } = await supabase.auth.getUser();
-    const moi = auth.user?.id;
+    const moi = await monId();
     if (!moi) return { ok: false, message: "Session expirée." };
 
     // Si l'autre m'a déjà invité, on accepte au lieu de créer un doublon.
